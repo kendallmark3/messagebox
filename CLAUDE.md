@@ -12,41 +12,50 @@ To exercise the UI without a real key, point the SDK at a local stand-in with `A
 
 ## Architecture
 
-V1 is implemented as two pieces with no framework and no build step:
+Two pieces, with no framework and no build step:
 
-- `server.js` is a plain `node:http` server. It serves three static files from `public/` through an explicit allow-list (nothing else on disk is reachable) and exposes `POST /api/evaluate`. That handler makes one `client.messages.parse` call with a zod schema as the structured output format, re-validates the result against the same schema, and maps every failure to a short user-safe message; details go to the server log only.
-- `public/` is static HTML, CSS, and one script. The script owns the screen states (empty, waiting, evaluation, error), re-checks the response shape before rendering, and never shows a partial evaluation.
+- `server.js` is a plain `node:http` server. It serves three static files from `public/` through an explicit allow-list (nothing else on disk is reachable) and exposes the ideas API under `/api/ideas`: list (optionally by `submitterId`), get one, create, `POST /:id/stage`, and `PUT /:id/outcome`.
+  - Creating an idea makes the one `client.messages.parse` call, with a zod schema as the structured output format. An idea is stored only if that evaluation succeeds.
+  - Ideas are held in memory and written to `data/ideas.json` (git-ignored) after every change. There is no database.
+  - The server owns the rules: stages move one step at a time, a move needs a note, and an outcome is only accepted at Pilot or Investment. Every failure maps to a short user-safe message; details go to the server log only.
+- `public/` is static HTML, CSS, and one script. The Submit view is static markup; the other four views and the idea detail are built in `app.js` and selected by a hash route (`#/my-ideas`, `#/pipeline/<id>`, and so on). Analytics and Impact figures are computed in the browser from the ideas list, so they always match what is stored.
 
-The zod `Evaluation` schema in `server.js` is the evaluation contract. The field ids in `public/index.html` and the `FIELDS` and `BADGE_CLASS` maps in `public/app.js` must change with it.
+Things that must change together:
+
+- The zod `Evaluation` schema in `server.js` is the evaluation contract; `FIELDS` and `BADGE_CLASS` in `public/app.js` mirror it.
+- The stage list exists in both `server.js` (`STAGES`) and `public/app.js` (`STAGES`), and stage colours are keyed by stage name in `public/styles.css`.
+
+"My Ideas" is keyed by a random id kept in the browser's `localStorage` and sent as `submitterId`. It is not authentication.
 
 ## What is being built
 
-V1 of the AI Suggestion Box ("Ideas Workbench"): a single-screen, desktop-first web app where an employee types one free-text workplace problem or idea and gets back a structured AI evaluation from one Anthropic API call. It is an evaluation workbench, not a chat and not a portal.
+The AI Suggestion Box ("Ideas Workbench"): a desktop-first web app where an employee types one free-text workplace problem or idea and gets back a structured AI evaluation from one Anthropic API call. Since V2, each evaluated idea is stored and can be moved through Problem → Evidence → Prototype → Pilot → Investment. It is an evaluation workbench, not a chat and not a portal.
 
 ## Which document governs
 
 - `intentv1.md` is the author's original intent and wins on product meaning.
-- `INTENT.md` is the implementation-ready restatement of it. Build from this one: it adds the evaluation contract, acceptance criteria, validation evidence, and stop condition.
+- `INTENT.md` is the implementation-ready restatement of it: the evaluation contract, acceptance criteria, validation evidence, and stop condition for V1.
+- `intentv2.md` is the V2 intent. It relaxes three V1 constraints (persistence, manual stage moves, working navigation) and keeps the rest. Its three "Decisions to Confirm" were built with their defaults and have not been explicitly confirmed by the author.
 - `README.md` is a reader-facing summary derived from `intentv1.md`.
 
 If you change scope, keep the three consistent, and do not edit `intentv1.md` unless asked.
 
-## Decisions already made in INTENT.md
+## Decisions already made in the intents
 
 - The evaluation returns exactly six fields: `problem`, `whoItAffects`, `potentialValue`, `missingEvidence`, `smallestNextStep`, `recommendation`.
 - `recommendation` is one of `Strong Candidate`, `Worth Exploring`, `Needs More Evidence`, `Low Value / Unclear`.
-- The Anthropic API key is read from an environment variable and used server-side only, so the app needs at least a thin server-side layer even though it is one page.
-- Only "Submit Idea" is functional. My Ideas, Review Pipeline, Analytics, and Impact are inert navigation items.
-- The pipeline (Problem → Evidence → Prototype → Pilot → Investment) is a visual only; a submission always sits at Problem.
-- No persistence, authentication, chat, workflow engine, multi-agent orchestration, or Jira integration.
-- The stack is the implementer's choice; pick the smallest one that works.
+- The Anthropic API key is read from an environment variable and used server-side only.
+- The only AI call is the evaluation at submission. AI does not move ideas between stages or produce analytics or impact figures.
+- Impact numbers are reviewer-entered estimates and are labelled as such.
+- Views start empty; there are no seeded or invented ideas. The Top Ideas panel is a static example list.
+- No authentication, roles, approvals, notifications, chat, workflow engine, multi-agent orchestration, database server, or Jira integration.
 
-The intent's stop condition is deliberate: once submission and evaluation work and the acceptance criteria are evidenced, stop rather than extending into workflow features.
+Each intent's stop condition is deliberate: once its acceptance criteria are evidenced, stop rather than extending into further workflow features.
 
 ## Known gaps and deliberate differences
 
 - `concept.png` is the concept image `intentv1.md` refers to. The screen follows it in spirit but deliberately omits its search box, vote counts, and per-stage counts: none are in the intent, and they would be non-functional or invented data.
-- The evaluation has only been validated against a stand-in API. It still needs a run against the live Anthropic API with the four example sentences from `intentv1.md`.
+- V1 and V2 have only been validated against a stand-in API. Both still need a run against the live Anthropic API with the four example sentences from `intentv1.md`.
 - The request does not opt into the API's server-side refusal `fallbacks`; a refusal is shown to the user as "couldn't be evaluated".
 
 ## intent-driven-starter/

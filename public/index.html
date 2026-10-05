@@ -30,11 +30,11 @@
         <span class="brand-chip">AI</span>
       </div>
       <nav class="nav" aria-label="Main">
-        <a class="nav-item is-active" href="#submit" aria-current="page"><svg><use href="#i-plus"/></svg>Submit Idea</a>
-        <span class="nav-item is-inert" aria-disabled="true"><svg><use href="#i-list"/></svg>My Ideas</span>
-        <span class="nav-item is-inert" aria-disabled="true"><svg><use href="#i-flow"/></svg>Review Pipeline</span>
-        <span class="nav-item is-inert" aria-disabled="true"><svg><use href="#i-bars"/></svg>Analytics</span>
-        <span class="nav-item is-inert" aria-disabled="true"><svg><use href="#i-leaf"/></svg>Impact</span>
+        <a class="nav-item" href="#/submit" data-view="submit"><svg><use href="#i-plus"/></svg>Submit Idea</a>
+        <a class="nav-item" href="#/my-ideas" data-view="my-ideas"><svg><use href="#i-list"/></svg>My Ideas</a>
+        <a class="nav-item" href="#/pipeline" data-view="pipeline"><svg><use href="#i-flow"/></svg>Review Pipeline</a>
+        <a class="nav-item" href="#/analytics" data-view="analytics"><svg><use href="#i-bars"/></svg>Analytics</a>
+        <a class="nav-item" href="#/impact" data-view="impact"><svg><use href="#i-leaf"/></svg>Impact</a>
       </nav>
       <p class="sidebar-foot">Let good ideas earn the right to proceed.</p>
     </aside>
@@ -42,12 +42,13 @@
     <main class="main">
       <header class="header">
         <div>
-          <h1>Ideas Workbench</h1>
-          <p class="lede">Tell us about a problem or opportunity you see at work. You'll get a quick assessment of whether it's worth pursuing.</p>
+          <h1 id="view-title">Ideas Workbench</h1>
+          <p class="lede" id="view-lede"></p>
         </div>
         <button type="button" class="btn btn-accent" id="new-idea">+ New Idea</button>
       </header>
 
+      <div id="view-submit" hidden>
       <div class="columns">
         <section class="card" id="submit">
           <form id="idea-form" novalidate>
@@ -85,36 +86,7 @@
         </aside>
       </div>
 
-      <section class="card pipeline" id="pipeline" aria-labelledby="pipeline-title">
-        <h2 class="card-title" id="pipeline-title">Idea Pipeline</h2>
-        <ol class="stages">
-          <li class="stage stage-problem is-current">
-            <span class="stage-dot"><svg><use href="#i-bulb"/></svg></span>
-            <span class="stage-name">Problem</span>
-            <span class="stage-note" id="stage-note">New ideas start here</span>
-          </li>
-          <li class="stage stage-evidence">
-            <span class="stage-dot"><svg><use href="#i-doc"/></svg></span>
-            <span class="stage-name">Evidence</span>
-            <span class="stage-note">Show that it matters</span>
-          </li>
-          <li class="stage stage-prototype">
-            <span class="stage-dot"><svg><use href="#i-gear"/></svg></span>
-            <span class="stage-name">Prototype</span>
-            <span class="stage-note">Test it cheaply</span>
-          </li>
-          <li class="stage stage-pilot">
-            <span class="stage-dot"><svg><use href="#i-flask"/></svg></span>
-            <span class="stage-name">Pilot</span>
-            <span class="stage-note">Try it with real users</span>
-          </li>
-          <li class="stage stage-investment">
-            <span class="stage-dot"><svg><use href="#i-bars"/></svg></span>
-            <span class="stage-name">Investment</span>
-            <span class="stage-note">Fund and scale it</span>
-          </li>
-        </ol>
-      </section>
+      <div id="submit-pipeline"></div>
 
       <section class="card notice notice-error" id="error" role="alert" hidden>
         <p id="error-text"></p>
@@ -126,34 +98,10 @@
         <p>Evaluating your idea…</p>
       </section>
 
-      <section class="card evaluation" id="evaluation" aria-live="polite" hidden>
-        <div class="evaluation-head">
-          <h2 class="card-title">Evaluation</h2>
-          <span class="badge" id="recommendation"></span>
-        </div>
-        <dl class="fields">
-          <div class="field">
-            <dt>Problem</dt>
-            <dd id="f-problem"></dd>
-          </div>
-          <div class="field">
-            <dt>Who it affects</dt>
-            <dd id="f-who"></dd>
-          </div>
-          <div class="field">
-            <dt>Potential value</dt>
-            <dd id="f-value"></dd>
-          </div>
-          <div class="field">
-            <dt>Missing evidence</dt>
-            <dd id="f-evidence"></dd>
-          </div>
-          <div class="field field-next">
-            <dt>Smallest next step</dt>
-            <dd id="f-next"></dd>
-          </div>
-        </dl>
-      </section>
+      <div id="evaluation" aria-live="polite"></div>
+      </div>
+
+      <div id="view-dynamic" hidden></div>
     </main>
   </div>
   <script src="/app.js"></script>

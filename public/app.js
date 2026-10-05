@@ -1,22 +1,20 @@
-const form = document.getElementById("idea-form");
-const input = document.getElementById("suggestion");
-const submitBtn = document.getElementById("submit-btn");
-const newIdeaBtn = document.getElementById("new-idea");
-const retryBtn = document.getElementById("retry");
-const loading = document.getElementById("loading");
-const errorBox = document.getElementById("error");
-const errorText = document.getElementById("error-text");
-const evaluationBox = document.getElementById("evaluation");
-const stageNote = document.getElementById("stage-note");
-const badge = document.getElementById("recommendation");
+const STAGES = [
+  { name: "Problem", icon: "i-bulb", note: "New ideas start here" },
+  { name: "Evidence", icon: "i-doc", note: "Show that it matters" },
+  { name: "Prototype", icon: "i-gear", note: "Test it cheaply" },
+  { name: "Pilot", icon: "i-flask", note: "Try it with real users" },
+  { name: "Investment", icon: "i-bars", note: "Fund and scale it" },
+];
+const STAGE_NAMES = STAGES.map((stage) => stage.name);
+const OUTCOME_STAGES = ["Pilot", "Investment"];
 
-const FIELDS = {
-  problem: "f-problem",
-  whoItAffects: "f-who",
-  potentialValue: "f-value",
-  missingEvidence: "f-evidence",
-  smallestNextStep: "f-next",
-};
+const FIELDS = [
+  ["problem", "Problem"],
+  ["whoItAffects", "Who it affects"],
+  ["potentialValue", "Potential value"],
+  ["missingEvidence", "Missing evidence"],
+  ["smallestNextStep", "Smallest next step"],
+];
 
 const BADGE_CLASS = {
   "Strong Candidate": "badge-strong",
@@ -25,34 +23,185 @@ const BADGE_CLASS = {
   "Low Value / Unclear": "badge-low",
 };
 
-const GENERIC_ERROR = "We couldn't evaluate this idea. Please try again.";
+const VIEWS = {
+  submit: {
+    title: "Ideas Workbench",
+    lede: "Tell us about a problem or opportunity you see at work. You'll get a quick assessment of whether it's worth pursuing.",
+  },
+  "my-ideas": { title: "My Ideas", lede: "The ideas you've submitted from this browser.", render: renderMyIdeas },
+  pipeline: { title: "Review Pipeline", lede: "Every idea, by the stage it has earned.", render: renderPipeline },
+  analytics: { title: "Analytics", lede: "What has been submitted so far.", render: renderAnalytics },
+  impact: { title: "Impact", lede: "What ideas at Pilot and Investment have led to.", render: renderImpact },
+};
+
+const GENERIC_ERROR = "Something went wrong. Please try again.";
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/* DOM helpers */
+
+function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(props || {})) {
+    if (value === false || value == null) continue;
+    if (key === "class") el.className = value;
+    else if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
+    else if (key in el && key !== "list" && key !== "form") el[key] = value;
+    else el.setAttribute(key, value);
+  }
+  el.append(...children.flat().filter((child) => child != null && child !== false));
+  return el;
+}
+
+function icon(id) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  const use = document.createElementNS(SVG_NS, "use");
+  use.setAttribute("href", `#${id}`);
+  svg.append(use);
+  return svg;
+}
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function formatHours(hours) {
+  return hours.toLocaleString(undefined, { maximumFractionDigits: 1 });
+}
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+/* Data */
+
+// "My ideas" means "submitted from this browser": there are no accounts.
+function getSubmitterId() {
+  try {
+    let id = localStorage.getItem("submitterId");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("submitterId", id);
+    }
+    return id;
+  } catch {
+    return (getSubmitterId.fallback ??= crypto.randomUUID());
+  }
+}
+
+async function api(path, { method = "GET", body } = {}) {
+  let response;
+  try {
+    response = await fetch(path, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error("We couldn't reach the workbench. Check your connection and try again.");
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) throw new Error(data?.error || GENERIC_ERROR);
+  return data;
+}
+
+function isValidEvaluation(evaluation) {
+  return (
+    evaluation &&
+    FIELDS.every(([key]) => typeof evaluation[key] === "string" && evaluation[key].trim() !== "") &&
+    evaluation.recommendation in BADGE_CLASS
+  );
+}
+
+/* Shared components */
+
+function badge(recommendation) {
+  return h("span", { class: `badge ${BADGE_CLASS[recommendation] || "badge-low"}` }, recommendation);
+}
+
+function stageTag(stage) {
+  return h("span", { class: `tag tag-${stage.toLowerCase()}` }, stage);
+}
+
+function pipelineCard(currentStage, currentNote) {
+  return h(
+    "section",
+    { class: "card pipeline", "aria-label": "Idea pipeline" },
+    h("h2", { class: "card-title" }, "Idea Pipeline"),
+    h(
+      "ol",
+      { class: "stages" },
+      STAGES.map((stage) => {
+        const current = stage.name === currentStage;
+        return h(
+          "li",
+          { class: `stage stage-${stage.name.toLowerCase()}${current ? " is-current" : ""}` },
+          h("span", { class: "stage-dot" }, icon(stage.icon)),
+          h("span", { class: "stage-name" }, stage.name),
+          h("span", { class: "stage-note" }, current ? currentNote : stage.note)
+        );
+      })
+    )
+  );
+}
+
+function evaluationCard(evaluation, headExtra) {
+  return h(
+    "section",
+    { class: "card evaluation" },
+    h("div", { class: "evaluation-head" }, h("h2", { class: "card-title" }, "Evaluation"), badge(evaluation.recommendation)),
+    h(
+      "dl",
+      { class: "fields" },
+      FIELDS.map(([key, label]) =>
+        h("div", { class: `field${key === "smallestNextStep" ? " field-next" : ""}` }, h("dt", null, label), h("dd", null, evaluation[key]))
+      )
+    ),
+    headExtra
+  );
+}
+
+function emptyState(title, text, action) {
+  return h("section", { class: "card empty" }, h("h2", { class: "card-title" }, title), h("p", { class: "hint" }, text), action);
+}
+
+function statTile(value, label, note) {
+  return h(
+    "div",
+    { class: "card tile-stat" },
+    h("span", { class: "stat-label" }, label),
+    h("span", { class: "stat-value" }, String(value)),
+    note && h("span", { class: "hint" }, note)
+  );
+}
+
+function ideaRow(idea, href, extra) {
+  const text = idea.suggestion.length > 140 ? `${idea.suggestion.slice(0, 140).trimEnd()}…` : idea.suggestion;
+  return h(
+    "a",
+    { class: "idea-row", href },
+    h("span", { class: "idea-row-main" }, h("span", { class: "idea-row-text" }, text), h("span", { class: "hint" }, extra || `Submitted ${formatDate(idea.submittedAt)}`)),
+    h("span", { class: "idea-row-meta" }, badge(idea.evaluation.recommendation), stageTag(idea.stage))
+  );
+}
+
+/* Submit view (static markup in index.html) */
+
+const form = document.getElementById("idea-form");
+const input = document.getElementById("suggestion");
+const submitBtn = document.getElementById("submit-btn");
+const loading = document.getElementById("loading");
+const errorBox = document.getElementById("error");
+const errorText = document.getElementById("error-text");
+const evaluationBox = document.getElementById("evaluation");
+const submitPipeline = document.getElementById("submit-pipeline");
 let pending = false;
 
 function syncSubmit() {
   submitBtn.disabled = pending || input.value.trim() === "";
 }
 
-function show(el, visible) {
-  el.hidden = !visible;
-}
-
-function isValidEvaluation(evaluation) {
-  return (
-    evaluation &&
-    Object.keys(FIELDS).every((key) => typeof evaluation[key] === "string" && evaluation[key].trim() !== "") &&
-    evaluation.recommendation in BADGE_CLASS
-  );
-}
-
-function renderEvaluation(evaluation) {
-  for (const [key, id] of Object.entries(FIELDS)) {
-    document.getElementById(id).textContent = evaluation[key];
-  }
-  badge.textContent = evaluation.recommendation;
-  badge.className = `badge ${BADGE_CLASS[evaluation.recommendation]}`;
-  stageNote.textContent = "Your idea is here";
-  show(evaluationBox, true);
-  document.getElementById("pipeline").scrollIntoView({ behavior: "smooth", block: "start" });
+function showSubmitPipeline(note) {
+  submitPipeline.replaceChildren(pipelineCard("Problem", note));
 }
 
 async function submitIdea() {
@@ -62,39 +211,40 @@ async function submitIdea() {
   pending = true;
   syncSubmit();
   input.readOnly = true;
-  show(errorBox, false);
-  show(evaluationBox, false);
-  show(loading, true);
+  errorBox.hidden = true;
+  evaluationBox.replaceChildren();
+  loading.hidden = false;
 
   try {
-    const response = await fetch("/api/evaluate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ suggestion }),
-    });
-    const body = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(body?.error || GENERIC_ERROR);
-    if (!isValidEvaluation(body?.evaluation)) throw new Error(GENERIC_ERROR);
-    renderEvaluation(body.evaluation);
+    const { idea } = await api("/api/ideas", { method: "POST", body: { suggestion, submitterId: getSubmitterId() } });
+    if (!isValidEvaluation(idea?.evaluation)) throw new Error("We couldn't evaluate this idea. Please try again.");
+    showSubmitPipeline("Your idea is here");
+    evaluationBox.replaceChildren(
+      evaluationCard(
+        idea.evaluation,
+        h("p", { class: "saved-note" }, "Saved. ", h("a", { href: `#/my-ideas/${idea.id}` }, "View it in My Ideas"))
+      )
+    );
+    submitPipeline.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
-    errorText.textContent = error instanceof TypeError ? "We couldn't reach the workbench. Check your connection and try again." : error.message;
-    show(errorBox, true);
+    errorText.textContent = error.message;
+    errorBox.hidden = false;
   } finally {
     pending = false;
     input.readOnly = false;
-    show(loading, false);
+    loading.hidden = true;
     syncSubmit();
   }
 }
 
-function resetWorkbench() {
+function resetSubmit() {
   if (pending) return;
   form.reset();
-  show(errorBox, false);
-  show(evaluationBox, false);
-  stageNote.textContent = "New ideas start here";
+  errorBox.hidden = true;
+  evaluationBox.replaceChildren();
+  showSubmitPipeline("New ideas start here");
   syncSubmit();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0 });
   input.focus({ preventScroll: true });
 }
 
@@ -103,6 +253,414 @@ form.addEventListener("submit", (event) => {
   submitIdea();
 });
 input.addEventListener("input", syncSubmit);
-retryBtn.addEventListener("click", submitIdea);
-newIdeaBtn.addEventListener("click", resetWorkbench);
+document.getElementById("retry").addEventListener("click", submitIdea);
+document.getElementById("new-idea").addEventListener("click", () => {
+  if (currentRoute().view === "submit") resetSubmit();
+  else {
+    resetSubmit();
+    location.hash = "#/submit";
+  }
+});
+
+/* My Ideas */
+
+async function renderMyIdeas() {
+  const { ideas } = await api(`/api/ideas?submitterId=${encodeURIComponent(getSubmitterId())}`);
+  if (ideas.length === 0) {
+    return emptyState(
+      "You haven't submitted any ideas yet",
+      "Ideas you submit from this browser will appear here with their evaluation and stage.",
+      h("a", { class: "btn btn-primary", href: "#/submit" }, "Submit an idea")
+    );
+  }
+  const newestFirst = [...ideas].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  return h("section", { class: "card list" }, newestFirst.map((idea) => ideaRow(idea, `#/my-ideas/${idea.id}`)));
+}
+
+/* Review Pipeline */
+
+async function renderPipeline() {
+  const { ideas } = await api("/api/ideas");
+  if (ideas.length === 0) {
+    return emptyState(
+      "No ideas in the pipeline yet",
+      "Submitted ideas start at Problem and move forward as they earn it.",
+      h("a", { class: "btn btn-primary", href: "#/submit" }, "Submit an idea")
+    );
+  }
+  return h(
+    "div",
+    { class: "board" },
+    STAGES.map((stage) => {
+      const inStage = ideas.filter((idea) => idea.stage === stage.name);
+      return h(
+        "section",
+        { class: `board-column stage-${stage.name.toLowerCase()}` },
+        h("h2", { class: "board-head" }, h("span", { class: "board-dot" }), stage.name, h("span", { class: "board-count" }, String(inStage.length))),
+        inStage.length === 0
+          ? h("p", { class: "hint board-empty" }, "No ideas here yet")
+          : inStage.map((idea) =>
+              h(
+                "a",
+                { class: "board-card", href: `#/pipeline/${idea.id}` },
+                h("span", { class: "board-card-text" }, idea.suggestion.length > 90 ? `${idea.suggestion.slice(0, 90).trimEnd()}…` : idea.suggestion),
+                badge(idea.evaluation.recommendation)
+              )
+            )
+      );
+    })
+  );
+}
+
+/* Idea detail: read-only from My Ideas, with review controls from Review Pipeline and Impact */
+
+async function renderDetail(view, id) {
+  const { idea } = await api(`/api/ideas/${encodeURIComponent(id)}`);
+  const position = STAGE_NAMES.indexOf(idea.stage);
+  const canRecordOutcome = view !== "my-ideas" && OUTCOME_STAGES.includes(idea.stage);
+
+  return h(
+    "div",
+    { class: "detail" },
+    h("a", { class: "back-link", href: `#/${view}` }, `← Back to ${VIEWS[view].title}`),
+    h(
+      "section",
+      { class: "card" },
+      h("div", { class: "evaluation-head" }, h("h2", { class: "card-title" }, "Suggestion"), stageTag(idea.stage)),
+      h("p", { class: "suggestion-text" }, idea.suggestion),
+      h("p", { class: "hint" }, `Submitted ${formatDate(idea.submittedAt)}`)
+    ),
+    pipelineCard(idea.stage, "This idea is here"),
+    view === "pipeline" && moveForm(idea, position),
+    evaluationCard(idea.evaluation),
+    canRecordOutcome ? outcomeForm(idea) : idea.outcome && outcomeSummary(idea.outcome),
+    historyCard(idea)
+  );
+}
+
+function historyCard(idea) {
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", { class: "card-title" }, "Stage history"),
+    idea.history.length === 0
+      ? h("p", { class: "hint" }, "This idea has not moved from Problem yet.")
+      : h(
+          "ol",
+          { class: "history" },
+          idea.history.map((entry) =>
+            h(
+              "li",
+              null,
+              h("span", { class: "history-move" }, `${entry.from} → ${entry.to}`),
+              h("span", { class: "hint" }, formatDate(entry.at)),
+              h("p", null, entry.note)
+            )
+          )
+        )
+  );
+}
+
+function outcomeSummary(outcome) {
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", { class: "card-title" }, "Outcome"),
+    h("p", { class: "suggestion-text" }, outcome.description),
+    h("p", { class: "hint" }, `Reviewer estimate: ${formatHours(outcome.hoursSavedPerWeek)} hours saved per week`)
+  );
+}
+
+// Runs a save, then redraws the current view so every figure reflects it.
+async function saveAndRefresh(formEl, messageEl, request) {
+  const buttons = formEl.querySelectorAll("button");
+  buttons.forEach((button) => (button.disabled = true));
+  messageEl.textContent = "Saving…";
+  messageEl.className = "hint form-message";
+  try {
+    await request();
+    await route();
+  } catch (error) {
+    messageEl.textContent = error.message;
+    messageEl.className = "form-message is-error";
+    buttons.forEach((button) => (button.disabled = false));
+  }
+}
+
+function moveForm(idea, position) {
+  const note = h("textarea", { id: "move-note", rows: 2, maxLength: 500, placeholder: "Why is this idea moving?" });
+  const message = h("span", { class: "hint form-message", role: "status" });
+  const formEl = h("form", { class: "card review-form", novalidate: "" });
+
+  const move = (direction) => {
+    if (note.value.trim() === "") {
+      message.textContent = "Add a short note saying why before moving the idea.";
+      message.className = "form-message is-error";
+      note.focus();
+      return;
+    }
+    saveAndRefresh(formEl, message, () =>
+      api(`/api/ideas/${idea.id}/stage`, { method: "POST", body: { direction, note: note.value.trim() } })
+    );
+  };
+
+  formEl.append(
+    h("h2", { class: "card-title" }, "Move this idea"),
+    h("label", { class: "prompt", for: "move-note" }, "A short note is required and is kept in the idea's history."),
+    note,
+    h(
+      "div",
+      { class: "form-row" },
+      message,
+      h(
+        "span",
+        { class: "button-group" },
+        position > 0 && h("button", { type: "button", class: "btn btn-secondary", onclick: () => move("back") }, `← Back to ${STAGE_NAMES[position - 1]}`),
+        position < STAGE_NAMES.length - 1 &&
+          h("button", { type: "button", class: "btn btn-primary", onclick: () => move("forward") }, `Move to ${STAGE_NAMES[position + 1]} →`)
+      )
+    )
+  );
+  formEl.addEventListener("submit", (event) => event.preventDefault());
+  return formEl;
+}
+
+function outcomeForm(idea) {
+  const description = h("textarea", { id: "outcome-description", rows: 2, maxLength: 500, placeholder: "What has this idea led to?" });
+  description.value = idea.outcome?.description ?? "";
+  const hours = h("input", { id: "outcome-hours", type: "number", min: "0", step: "0.5", inputMode: "decimal" });
+  hours.value = idea.outcome ? String(idea.outcome.hoursSavedPerWeek) : "";
+  const message = h("span", { class: "hint form-message", role: "status" });
+
+  const formEl = h(
+    "form",
+    { class: "card review-form", novalidate: "" },
+    h("h2", { class: "card-title" }, "Outcome"),
+    h("label", { class: "prompt", for: "outcome-description" }, "Describe the result so far."),
+    description,
+    h("label", { class: "prompt", for: "outcome-hours" }, "Estimated hours saved per week (your estimate)"),
+    hours,
+    h("div", { class: "form-row" }, message, h("button", { type: "submit", class: "btn btn-primary" }, idea.outcome ? "Update outcome" : "Record outcome"))
+  );
+
+  formEl.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const value = Number(hours.value);
+    if (description.value.trim() === "" || hours.value.trim() === "" || !Number.isFinite(value) || value < 0) {
+      message.textContent = "Add a description and an estimate of zero or more hours.";
+      message.className = "form-message is-error";
+      return;
+    }
+    saveAndRefresh(formEl, message, () =>
+      api(`/api/ideas/${idea.id}/outcome`, { method: "PUT", body: { description: description.value.trim(), hoursSavedPerWeek: value } })
+    );
+  });
+  return formEl;
+}
+
+/* Analytics */
+
+function barList(title, rows) {
+  const max = Math.max(1, ...rows.map((row) => row.count));
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", { class: "card-title" }, title),
+    h(
+      "ul",
+      { class: "bars" },
+      rows.map((row) =>
+        h(
+          "li",
+          { title: `${row.label}: ${plural(row.count, "idea")}` },
+          h("span", { class: "bar-label" }, row.label),
+          h("span", { class: "bar-track" }, h("span", { class: "bar-fill", style: `width: ${(row.count / max) * 100}%` })),
+          h("span", { class: "bar-value" }, String(row.count))
+        )
+      )
+    )
+  );
+}
+
+function dayKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function submissionsChart(ideas) {
+  const counts = new Map();
+  for (const idea of ideas) {
+    const key = dayKey(new Date(idea.submittedAt));
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  // One column per day, from the first submission (at most 30 days back) to today.
+  const today = new Date();
+  const first = new Date(Math.min(...ideas.map((idea) => new Date(idea.submittedAt))));
+  const days = [];
+  for (let offset = 29; offset >= 0; offset -= 1) {
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - offset);
+    if (dayKey(day) >= dayKey(first)) days.push(day);
+  }
+  const max = Math.max(1, ...days.map((day) => counts.get(dayKey(day)) || 0));
+  const label = (day) => day.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", { class: "card-title" }, "Submissions over time"),
+    h("p", { class: "hint" }, `Ideas submitted per day. The busiest day had ${max}.`),
+    h(
+      "div",
+      { class: "columns-chart", role: "img", "aria-label": `Ideas submitted per day from ${label(days[0])} to ${label(days.at(-1))}` },
+      days.map((day) => {
+        const count = counts.get(dayKey(day)) || 0;
+        return h(
+          "div",
+          { class: "column-slot", title: `${label(day)}: ${plural(count, "idea")}` },
+          h("span", { class: "column-value" }, count > 0 ? String(count) : ""),
+          h("span", { class: "column-bar", style: `height: ${(count / max) * 100}%` })
+        );
+      })
+    ),
+    h("div", { class: "chart-axis hint" }, h("span", null, label(days[0])), days.length > 1 && h("span", null, label(days.at(-1))))
+  );
+}
+
+async function renderAnalytics() {
+  const { ideas } = await api("/api/ideas");
+  if (ideas.length === 0) {
+    return emptyState(
+      "Nothing to analyse yet",
+      "Counts and charts appear here once ideas have been submitted.",
+      h("a", { class: "btn btn-primary", href: "#/submit" }, "Submit an idea")
+    );
+  }
+  const count = (test) => ideas.filter(test).length;
+  return h(
+    "div",
+    { class: "stack" },
+    h(
+      "div",
+      { class: "tiles" },
+      statTile(ideas.length, "Ideas submitted"),
+      statTile(count((idea) => idea.stage !== "Problem"), "Moved beyond Problem"),
+      statTile(count((idea) => idea.evaluation.recommendation === "Strong Candidate"), "Strong candidates")
+    ),
+    h(
+      "div",
+      { class: "two-up" },
+      barList("Ideas per stage", STAGE_NAMES.map((stage) => ({ label: stage, count: count((idea) => idea.stage === stage) }))),
+      barList(
+        "Ideas per recommendation",
+        Object.keys(BADGE_CLASS).map((recommendation) => ({
+          label: recommendation,
+          count: count((idea) => idea.evaluation.recommendation === recommendation),
+        }))
+      )
+    ),
+    submissionsChart(ideas)
+  );
+}
+
+/* Impact */
+
+async function renderImpact() {
+  const { ideas } = await api("/api/ideas");
+  const advanced = ideas.filter((idea) => OUTCOME_STAGES.includes(idea.stage));
+  if (advanced.length === 0) {
+    return emptyState(
+      "No ideas have reached Pilot yet",
+      "Ideas appear here once they reach Pilot or Investment, and a reviewer can then record what they led to.",
+      h("a", { class: "btn btn-primary", href: "#/pipeline" }, "Open Review Pipeline")
+    );
+  }
+  const withOutcome = advanced.filter((idea) => idea.outcome);
+  const totalHours = withOutcome.reduce((sum, idea) => sum + idea.outcome.hoursSavedPerWeek, 0);
+  return h(
+    "div",
+    { class: "stack" },
+    h(
+      "div",
+      { class: "tiles" },
+      statTile(advanced.filter((idea) => idea.stage === "Pilot").length, "Ideas at Pilot"),
+      statTile(advanced.filter((idea) => idea.stage === "Investment").length, "Ideas at Investment"),
+      statTile(
+        formatHours(totalHours),
+        "Estimated hours saved per week",
+        `Reviewer estimates from ${plural(withOutcome.length, "recorded outcome")}`
+      )
+    ),
+    h(
+      "section",
+      { class: "card list" },
+      advanced.map((idea) =>
+        ideaRow(
+          idea,
+          `#/impact/${idea.id}`,
+          idea.outcome
+            ? `${idea.outcome.description} · Reviewer estimate: ${formatHours(idea.outcome.hoursSavedPerWeek)} hours per week`
+            : "No outcome recorded yet"
+        )
+      )
+    )
+  );
+}
+
+/* Router */
+
+const submitView = document.getElementById("view-submit");
+const dynamicView = document.getElementById("view-dynamic");
+let routeToken = 0;
+
+function currentRoute() {
+  const [view, id] = location.hash.replace(/^#\/?/, "").split("/");
+  return view in VIEWS ? { view, id } : { view: "submit" };
+}
+
+async function route() {
+  const { view, id } = currentRoute();
+  const token = (routeToken += 1);
+
+  document.getElementById("view-title").textContent = VIEWS[view].title;
+  document.getElementById("view-lede").textContent = VIEWS[view].lede;
+  document.title = view === "submit" ? "Ideas Workbench" : `${VIEWS[view].title} · Ideas Workbench`;
+  for (const item of document.querySelectorAll(".nav-item")) {
+    const active = item.dataset.view === view;
+    item.classList.toggle("is-active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  }
+
+  submitView.hidden = view !== "submit";
+  dynamicView.hidden = view === "submit";
+  if (view === "submit") return;
+
+  // Keep the previous content in place when the same view is redrawn after a save.
+  if (dynamicView.dataset.route !== location.hash) {
+    dynamicView.replaceChildren(h("section", { class: "card notice" }, h("span", { class: "spinner", "aria-hidden": "true" }), h("p", null, "Loading…")));
+  }
+  try {
+    const content = id ? await renderDetail(view, id) : await VIEWS[view].render();
+    if (token !== routeToken) return;
+    dynamicView.replaceChildren(content);
+    dynamicView.dataset.route = location.hash;
+  } catch (error) {
+    if (token !== routeToken) return;
+    dynamicView.dataset.route = "";
+    dynamicView.replaceChildren(
+      h(
+        "section",
+        { class: "card notice notice-error", role: "alert" },
+        h("p", null, error.message),
+        h("button", { type: "button", class: "btn btn-quiet", onclick: route }, "Try again")
+      )
+    );
+  }
+}
+
+window.addEventListener("hashchange", () => {
+  window.scrollTo({ top: 0 });
+  route();
+});
+showSubmitPipeline("New ideas start here");
 syncSubmit();
+route();

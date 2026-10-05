@@ -2,7 +2,7 @@
 
 An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work, and AI returns a short structured evaluation so good ideas can earn the right to proceed.
 
-> **Status:** V1 is implemented: the submission screen and the AI evaluation work. The evaluation path has been exercised against a stand-in API; it has not yet been run against the live Anthropic API.
+> **Status:** V1 (submission and AI evaluation) and V2 (My Ideas, Review Pipeline, Analytics, Impact) are implemented. Both have been exercised against a stand-in API; neither has yet been run against the live Anthropic API.
 
 ## Run it locally
 
@@ -17,6 +17,19 @@ npm start
 Open http://localhost:3210. Set `PORT` in `.env` to use a different port.
 
 The API key is read by the server only. It is never sent to the browser, and `.env` is git-ignored.
+
+## What V2 adds
+
+V2 keeps every successfully evaluated idea and makes the rest of the navigation work. The full intent is in [intentv2.md](intentv2.md).
+
+- **My Ideas:** the ideas submitted from this browser, each with its evaluation, stage, and history. There is no sign-in, so "mine" means "from this browser".
+- **Review Pipeline:** all ideas grouped by stage. Anyone can move an idea one stage forward or back; a short note is required and is kept in the idea's history.
+- **Analytics:** ideas submitted, ideas per stage, ideas per recommendation, and submissions per day, all counted from stored ideas.
+- **Impact:** ideas at Pilot or Investment, with a reviewer-entered outcome and estimated hours saved per week. These figures are reviewer estimates; AI does not produce them.
+
+Ideas are stored in `data/ideas.json`, which is created on first submission and git-ignored. Delete it to start empty.
+
+The sections below describe V1; where they say a navigation item is a placeholder or that nothing is stored, V2 supersedes them.
 
 ## Product principle
 
@@ -107,8 +120,9 @@ The whole experience should feel simpler than writing an email or preparing a Po
 
 | Path | What it is |
 | --- | --- |
-| [server.js](server.js) | Serves the page and makes the one Anthropic API call behind `POST /api/evaluate` |
-| [public/](public/) | The workbench screen: HTML, CSS, and browser script |
+| [server.js](server.js) | Serves the page, stores ideas, and makes the one Anthropic API call when an idea is submitted |
+| [public/](public/) | The workbench screens: HTML, CSS, and browser script |
 | [INTENT.md](INTENT.md) | Implementation-ready intent that V1 was built from |
+| [intentv2.md](intentv2.md) | The V2 intent: stored ideas and the four remaining views |
 | [intentv1.md](intentv1.md) | The original V1 intent; the source of truth for product meaning |
 | [intent-driven-starter/](intent-driven-starter/) | Copy of the Intent-Driven Starter plugin (skills, agents, hooks) used to build from the intent |
