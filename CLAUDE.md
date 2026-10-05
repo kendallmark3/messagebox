@@ -2,9 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## State of the repository
+## Commands
 
-There is no application code yet, and the folder is not a git repository. It holds a product intent and a reference copy of a Claude Code plugin. There are no build, lint, test, or run commands; when V1 is implemented, add the real commands here and to README.md.
+- `npm install` then `npm start` runs the app at http://localhost:3210 (`PORT` overrides it). Requires Node 20.12+.
+- `ANTHROPIC_API_KEY` is read from `.env` (copy `.env.example`) or the process environment.
+- There is no build step, linter, or test suite.
+
+To exercise the UI without a real key, point the SDK at a local stand-in with `ANTHROPIC_BASE_URL` and any non-empty `ANTHROPIC_API_KEY`; the stand-in must answer `POST /v1/messages` with a message whose single text block is the evaluation JSON.
+
+## Architecture
+
+V1 is implemented as two pieces with no framework and no build step:
+
+- `server.js` is a plain `node:http` server. It serves three static files from `public/` through an explicit allow-list (nothing else on disk is reachable) and exposes `POST /api/evaluate`. That handler makes one `client.messages.parse` call with a zod schema as the structured output format, re-validates the result against the same schema, and maps every failure to a short user-safe message; details go to the server log only.
+- `public/` is static HTML, CSS, and one script. The script owns the screen states (empty, waiting, evaluation, error), re-checks the response shape before rendering, and never shows a partial evaluation.
+
+The zod `Evaluation` schema in `server.js` is the evaluation contract. The field ids in `public/index.html` and the `FIELDS` and `BADGE_CLASS` maps in `public/app.js` must change with it.
 
 ## What is being built
 
@@ -30,10 +43,11 @@ If you change scope, keep the three consistent, and do not edit `intentv1.md` un
 
 The intent's stop condition is deliberate: once submission and evaluation work and the acceptance criteria are evidenced, stop rather than extending into workflow features.
 
-## Known gaps
+## Known gaps and deliberate differences
 
-- The concept image that `intentv1.md` calls the visual direction is not in the repository. Use the Visual Direction list in `INTENT.md` until it is added.
-- Validating the evaluation needs an Anthropic API key in the local environment.
+- `concept.png` is the concept image `intentv1.md` refers to. The screen follows it in spirit but deliberately omits its search box, vote counts, and per-stage counts: none are in the intent, and they would be non-functional or invented data.
+- The evaluation has only been validated against a stand-in API. It still needs a run against the live Anthropic API with the four example sentences from `intentv1.md`.
+- The request does not opt into the API's server-side refusal `fallbacks`; a refusal is shown to the user as "couldn't be evaluated".
 
 ## intent-driven-starter/
 
@@ -44,6 +58,6 @@ The installed plugin provides the workflow this project uses:
 - `/intent-driven-starter:start` for repo-aware onboarding before proposing changes.
 - `/intent-driven-starter:intent-creator` to create or refine an intent (it produced `INTENT.md`).
 - `/intent-driven-starter:execute-intent` to implement an intent with its understand → refine → delta → implement → validate → stop discipline.
-- A Stop hook (`scripts/forbid-secrets.py`) that scans the git diff for likely secrets and blocks finishing if it finds one. It does nothing until this folder is a git repository.
+- A Stop hook (`scripts/forbid-secrets.py`) that scans the git diff for likely secrets and blocks finishing if it finds one.
 
 The `location-story` skill in the plugin is for map and geocoding projects and does not apply here.

@@ -14,7 +14,7 @@ Employees submit problems and opportunities, not technologies. The system helps 
 
 - The repository is greenfield: it holds intentv1.md, README.md, and a copy of the Intent-Driven Starter plugin. There is no application code, no build tooling, and no git history.
 - There is no existing Anthropic integration to reuse, so use the simplest direct Anthropic API integration.
-- The concept image that intentv1.md refers to is not in the repository. Until it is supplied, the Visual Direction section below is the visual specification.
+- The concept image that intentv1.md refers to is [concept.png](concept.png). It was added after this intent was first written; the screen follows it in spirit, within the Visual Direction and Constraints below.
 
 ### Runtime input
 
@@ -122,5 +122,4 @@ Stop when the submission experience and AI evaluation work cleanly, the acceptan
 
 ## Open Items
 
-- **Concept image:** needs to be added to the repository for a close visual match.
 - **API key:** an Anthropic API key must be available in the local environment before the evaluation can be validated.
