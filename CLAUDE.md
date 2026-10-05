@@ -37,13 +37,15 @@ The AI Suggestion Box ("Ideas Workbench"): a desktop-first web app where an empl
 
 ## Which document governs
 
-- `intentv1.md` is the author's original intent and wins on product meaning.
-- `INTENT.md` is the implementation-ready restatement of it: the evaluation contract, acceptance criteria, validation evidence, and stop condition for V1.
-- `intentv2.md` is the V2 intent. It relaxes three V1 constraints (persistence, manual stage moves, working navigation) and keeps the rest. Its three "Decisions to Confirm" were built with their defaults and have not been explicitly confirmed by the author.
-- `intentv3.md` is the V3 intent. It allows a second AI call (the analysis) and keeps every other constraint. Its four "Decisions to Confirm" were also built with their defaults.
-- `README.md` is a reader-facing summary derived from `intentv1.md`.
+- `intentv1.md` is the author's original intent and wins on product meaning. Do not edit it unless asked.
+- `INTENT.md` (V1), `intentv2.md`, and `intentv3.md` are the implementation-ready intents. Each ends with **Decisions Made** (V2, V3) and **As Built**, which record the concrete choices in the code: stack, API, limits, messages, screen layout, and wording. Together they are meant to be enough to rebuild the app.
+- `README.md` is the reader-facing summary of the current app.
 
-If you change scope, keep the three consistent, and do not edit `intentv1.md` unless asked.
+Keeping these in line is part of any change:
+
+- A change to behaviour, an API route, a limit, a user-facing message, or screen wording must be reflected in the As Built section of the intent that owns it.
+- The two system prompts in `server.js` are reproduced verbatim in the appendices of `INTENT.md` (evaluation) and `intentv3.md` (analysis). Change them together.
+- New scope gets a new intent file rather than rewriting an old one.
 
 ## Decisions already made in the intents
 
