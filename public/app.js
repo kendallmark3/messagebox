@@ -7,6 +7,8 @@ const STAGES = [
 ];
 const STAGE_NAMES = STAGES.map((stage) => stage.name);
 const OUTCOME_STAGES = ["Pilot", "Investment"];
+// A potential architecture exists only for ideas approved into this stage or beyond.
+const ANALYSIS_STAGE_INDEX = STAGE_NAMES.indexOf("Prototype");
 
 const FIELDS = [
   ["problem", "Problem"],
@@ -304,7 +306,7 @@ async function renderPipeline() {
                 "a",
                 { class: "board-card", href: `#/pipeline/${idea.id}` },
                 h("span", { class: "board-card-text" }, idea.suggestion.length > 90 ? `${idea.suggestion.slice(0, 90).trimEnd()}…` : idea.suggestion),
-                badge(idea.evaluation.recommendation)
+                h("span", { class: "board-card-tags" }, badge(idea.evaluation.recommendation), idea.analysis && h("span", { class: "badge badge-ai" }, "Architecture"))
               )
             )
       );
@@ -333,8 +335,115 @@ async function renderDetail(view, id) {
     pipelineCard(idea.stage, "This idea is here"),
     view === "pipeline" && moveForm(idea, position),
     evaluationCard(idea.evaluation),
+    architectureSection(view, idea),
     canRecordOutcome ? outcomeForm(idea) : idea.outcome && outcomeSummary(idea.outcome),
     historyCard(idea)
+  );
+}
+
+// Draws itself from the idea and, while an analysis is running, polls until it finishes.
+// Only this section is redrawn, so a note being typed elsewhere on the page is not lost.
+function architectureSection(view, idea) {
+  const container = h("div", { class: "architecture" });
+  const canRun = view === "pipeline";
+
+  const run = async (button, message) => {
+    button.disabled = true;
+    try {
+      draw((await api(`/api/ideas/${idea.id}/analysis`, { method: "POST" })).idea);
+    } catch (error) {
+      message.textContent = error.message;
+      message.className = "form-message is-error";
+      button.disabled = false;
+    }
+  };
+
+  const runRow = (label) => {
+    const message = h("span", { class: "hint form-message", role: "status" });
+    const button = h("button", { type: "button", class: "btn btn-secondary", onclick: () => run(button, message) }, label);
+    return h("div", { class: "form-row" }, message, button);
+  };
+
+  const poll = async () => {
+    if (!container.isConnected) return;
+    try {
+      draw((await api(`/api/ideas/${idea.id}`)).idea);
+    } catch {
+      setTimeout(poll, 4000);
+    }
+  };
+
+  function draw(current) {
+    const { analysis, analysisStatus: status } = current;
+    const eligible = STAGE_NAMES.indexOf(current.stage) >= ANALYSIS_STAGE_INDEX;
+    const parts = [];
+
+    if (status === "running") {
+      parts.push(
+        h(
+          "section",
+          { class: "card notice", "aria-live": "polite" },
+          h("span", { class: "spinner", "aria-hidden": "true" }),
+          h("p", null, analysis ? "Producing a new potential architecture…" : "Producing a potential architecture for this idea…")
+        )
+      );
+      setTimeout(poll, 2000);
+    }
+    if (status === "failed") {
+      parts.push(
+        h(
+          "section",
+          { class: "card notice notice-error", role: "alert" },
+          h("p", null, current.analysisError || GENERIC_ERROR),
+          canRun && eligible && h("button", { type: "button", class: "btn btn-quiet", onclick: (event) => run(event.currentTarget, event.currentTarget.previousSibling) }, "Try again")
+        )
+      );
+    }
+    if (analysis) {
+      parts.push(architectureCard(analysis, canRun && eligible && status !== "running" && runRow("Run the analysis again")));
+    } else if (status === "none" && eligible && canRun) {
+      parts.push(
+        h(
+          "section",
+          { class: "card" },
+          h("h2", { class: "card-title" }, "Potential architecture"),
+          h("p", { class: "hint" }, "No analysis has been produced for this idea yet."),
+          runRow("Run the analysis")
+        )
+      );
+    }
+    container.replaceChildren(...parts);
+  }
+
+  draw(idea);
+  return container;
+}
+
+function architectureCard(analysis, footer) {
+  const block = (label, body, extraClass) => h("div", { class: `field${extraClass ? ` ${extraClass}` : ""}` }, h("dt", null, label), h("dd", null, body));
+  const bullets = (items) => h("ul", { class: "plain-list" }, items.map((item) => h("li", null, item)));
+  return h(
+    "section",
+    { class: "card evaluation" },
+    h("div", { class: "evaluation-head" }, h("h2", { class: "card-title" }, "Potential architecture"), h("span", { class: "badge badge-ai" }, "AI-generated suggestion")),
+    h("p", { class: "hint ai-note" }, `Produced ${formatDate(analysis.generatedAt)} from this idea's suggestion, evaluation, and reviewer notes. Check it with the people who will build it.`),
+    h(
+      "dl",
+      { class: "fields" },
+      block("Proposed pattern", [h("strong", { class: "pattern-name" }, analysis.pattern), h("p", null, analysis.summary)], "field-next"),
+      block("Why it fits", analysis.whyItFits, "field-wide"),
+      block(
+        "Main parts",
+        h("ul", { class: "plain-list" }, analysis.components.map((part) => h("li", null, h("strong", null, `${part.name}: `), part.responsibility))),
+        "field-wide"
+      ),
+      block("Data and systems it would touch", analysis.dataAndIntegrations),
+      block("A simpler alternative", analysis.simplerAlternative),
+      block("Assumptions", bullets(analysis.assumptions)),
+      block("Risks", analysis.risks.length ? bullets(analysis.risks) : "None identified."),
+      block("Smallest first prototype", analysis.firstPrototype, "field-wide")
+    ),
+    footer
   );
 }
 

@@ -830,6 +830,44 @@ a.btn {
   color: var(--red);
 }
 
+/* Potential architecture (V3) */
+
+.badge-ai {
+  background: #ece9fb;
+  color: #5a3fc0;
+}
+
+.ai-note {
+  margin: -8px 0 18px;
+}
+
+.field-wide {
+  grid-column: 1 / -1;
+}
+
+.pattern-name {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.plain-list {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.board-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.architecture .form-row {
+  margin-top: 18px;
+}
+
 /* Analytics and Impact */
 
 .tiles {

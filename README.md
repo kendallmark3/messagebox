@@ -2,7 +2,7 @@
 
 An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work, and AI returns a short structured evaluation so good ideas can earn the right to proceed.
 
-> **Status:** V1 (submission and AI evaluation) and V2 (My Ideas, Review Pipeline, Analytics, Impact) are implemented. The four example sentences below have been run through the live Anthropic API, and each returned a complete evaluation.
+> **Status:** V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), and V3 (potential architecture on approval) are implemented. The four example sentences below have been run through the live Anthropic API for both the evaluation and the architecture analysis.
 
 ## Run it locally
 
@@ -26,6 +26,15 @@ V2 keeps every successfully evaluated idea and makes the rest of the navigation 
 - **Review Pipeline:** all ideas grouped by stage. Anyone can move an idea one stage forward or back; a short note is required and is kept in the idea's history.
 - **Analytics:** ideas submitted, ideas per stage, ideas per recommendation, and submissions per day, all counted from stored ideas.
 - **Impact:** ideas at Pilot or Investment, with a reviewer-entered outcome and estimated hours saved per week. These figures are reviewer estimates; AI does not produce them.
+
+## What V3 adds
+
+When a reviewer moves an idea from Evidence to Prototype, that move is the approval, and the workbench runs a second AI analysis that proposes a **potential architecture**: a solution shape, why it fits, its main parts, the data and systems it would touch, a simpler alternative, assumptions, risks, and the smallest first prototype. The full intent is in [intentv3.md](intentv3.md).
+
+- The analysis works only from what is stored on the idea: the suggestion, the evaluation, the reviewer notes, and any outcome.
+- It is labelled as an AI-generated suggestion wherever it is shown. It is a starting point, not a design.
+- A failed analysis never blocks or undoes the move. A reviewer can run it again from Review Pipeline, and the new result replaces the old one.
+- Ideas that were already at Prototype or beyond can have it run by hand.
 
 Ideas are stored in `data/ideas.json`, which is created on first submission and git-ignored. Delete it to start empty.
 
@@ -120,9 +129,10 @@ The whole experience should feel simpler than writing an email or preparing a Po
 
 | Path | What it is |
 | --- | --- |
-| [server.js](server.js) | Serves the page, stores ideas, and makes the one Anthropic API call when an idea is submitted |
+| [server.js](server.js) | Serves the page, stores ideas, and makes the two Anthropic API calls: evaluation on submission and analysis on approval |
 | [public/](public/) | The workbench screens: HTML, CSS, and browser script |
 | [INTENT.md](INTENT.md) | Implementation-ready intent that V1 was built from |
 | [intentv2.md](intentv2.md) | The V2 intent: stored ideas and the four remaining views |
+| [intentv3.md](intentv3.md) | The V3 intent: a potential architecture for approved ideas |
 | [intentv1.md](intentv1.md) | The original V1 intent; the source of truth for product meaning |
 | [intent-driven-starter/](intent-driven-starter/) | Copy of the Intent-Driven Starter plugin (skills, agents, hooks) used to build from the intent |
