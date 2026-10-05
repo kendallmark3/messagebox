@@ -55,7 +55,8 @@ Each intent's stop condition is deliberate: once its acceptance criteria are evi
 ## Known gaps and deliberate differences
 
 - `concept.png` is the concept image `intentv1.md` refers to. The screen follows it in spirit but deliberately omits its search box, vote counts, and per-stage counts: none are in the intent, and they would be non-functional or invented data.
-- V1 and V2 have only been validated against a stand-in API. Both still need a run against the live Anthropic API with the four example sentences from `intentv1.md`.
+- Live-API validation so far is the four example sentences from `intentv1.md` submitted through `POST /api/ideas` (all returned complete, contract-valid evaluations in roughly 5 to 13 seconds). The browser flows, failure states, and stage and outcome rules were checked against a stand-in API only.
+- Live evaluations tend to run longer than the "one to three short sentences" the system prompt asks for, especially `missingEvidence`.
 - The request does not opt into the API's server-side refusal `fallbacks`; a refusal is shown to the user as "couldn't be evaluated".
 
 ## intent-driven-starter/

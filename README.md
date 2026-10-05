@@ -2,7 +2,7 @@
 
 An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work, and AI returns a short structured evaluation so good ideas can earn the right to proceed.
 
-> **Status:** V1 (submission and AI evaluation) and V2 (My Ideas, Review Pipeline, Analytics, Impact) are implemented. Both have been exercised against a stand-in API; neither has yet been run against the live Anthropic API.
+> **Status:** V1 (submission and AI evaluation) and V2 (My Ideas, Review Pipeline, Analytics, Impact) are implemented. The four example sentences below have been run through the live Anthropic API, and each returned a complete evaluation.
 
 ## Run it locally
 
