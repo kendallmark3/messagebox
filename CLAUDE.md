@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm install` then `npm start` runs the app at http://localhost:3210 (`PORT` overrides it). Requires Node 20.12+.
 - `ANTHROPIC_API_KEY` is read from `.env` (copy `.env.example`) or the process environment.
 - There is no build step, linter, or test suite.
+- `IDEAS_FILE=/some/path.json` points the server at a different idea store. Use it for any test run: `data/ideas.json` holds the author's real ideas.
 
 To exercise the UI without a real key, point the SDK at a local stand-in with `ANTHROPIC_BASE_URL` and any non-empty `ANTHROPIC_API_KEY`; the stand-in must answer `POST /v1/messages` with a message whose single text block is the evaluation JSON.
 
@@ -15,27 +16,31 @@ To exercise the UI without a real key, point the SDK at a local stand-in with `A
 Two pieces, with no framework and no build step:
 
 - `server.js` is a plain `node:http` server. It serves three static files from `public/` through an explicit allow-list (nothing else on disk is reachable) and exposes the ideas API under `/api/ideas`: list (optionally by `submitterId`), get one, create, `POST /:id/stage`, and `PUT /:id/outcome`.
-  - Creating an idea makes the one `client.messages.parse` call, with a zod schema as the structured output format. An idea is stored only if that evaluation succeeds.
+  - There are two model calls, both through `askClaude` (`client.messages.parse` with a zod schema as the structured output format). Creating an idea runs the evaluation, and an idea is stored only if it succeeds. Moving an idea forward into Prototype, or `POST /:id/analysis`, runs the analysis.
+  - The analysis runs in the background after the move has been saved, so its failure cannot affect the move. In-progress and failed runs are tracked in memory only (`analysisRuns`); every idea returned by the API carries a computed `analysisStatus` of `none`, `running`, `failed`, or `ready`. Only a complete result is written to `idea.analysis`, replacing the previous one.
   - Ideas are held in memory and written to `data/ideas.json` (git-ignored) after every change. There is no database.
   - The server owns the rules: stages move one step at a time, a move needs a note, and an outcome is only accepted at Pilot or Investment. Every failure maps to a short user-safe message; details go to the server log only.
-- `public/` is static HTML, CSS, and one script. The Submit view is static markup; the other four views and the idea detail are built in `app.js` and selected by a hash route (`#/my-ideas`, `#/pipeline/<id>`, and so on). Analytics and Impact figures are computed in the browser from the ideas list, so they always match what is stored.
+- `public/` is static HTML, CSS, and one script. The Submit view is static markup; the other four views and the idea detail are built in `app.js` and selected by a hash route (`#/my-ideas`, `#/pipeline/<id>`, and so on). Analytics and Impact figures are computed in the browser from the ideas list, so they always match what is stored. On the idea detail, the Potential architecture section redraws itself and polls while a run is in progress, so a note being typed elsewhere on the page is not lost.
 
 Things that must change together:
 
 - The zod `Evaluation` schema in `server.js` is the evaluation contract; `FIELDS` and `BADGE_CLASS` in `public/app.js` mirror it.
+- The zod `Analysis` schema in `server.js` is the analysis contract; `architectureCard` in `public/app.js` renders its fields.
+- The stage that triggers the analysis is `ANALYSIS_STAGE` in `server.js` and `ANALYSIS_STAGE_INDEX` in `public/app.js`.
 - The stage list exists in both `server.js` (`STAGES`) and `public/app.js` (`STAGES`), and stage colours are keyed by stage name in `public/styles.css`.
 
 "My Ideas" is keyed by a random id kept in the browser's `localStorage` and sent as `submitterId`. It is not authentication.
 
 ## What is being built
 
-The AI Suggestion Box ("Ideas Workbench"): a desktop-first web app where an employee types one free-text workplace problem or idea and gets back a structured AI evaluation from one Anthropic API call. Since V2, each evaluated idea is stored and can be moved through Problem → Evidence → Prototype → Pilot → Investment. It is an evaluation workbench, not a chat and not a portal.
+The AI Suggestion Box ("Ideas Workbench"): a desktop-first web app where an employee types one free-text workplace problem or idea and gets back a structured AI evaluation from one Anthropic API call. Since V2, each evaluated idea is stored and can be moved through Problem → Evidence → Prototype → Pilot → Investment. Since V3, approving an idea into Prototype produces an AI-proposed potential architecture. It is an evaluation workbench, not a chat and not a portal.
 
 ## Which document governs
 
 - `intentv1.md` is the author's original intent and wins on product meaning.
 - `INTENT.md` is the implementation-ready restatement of it: the evaluation contract, acceptance criteria, validation evidence, and stop condition for V1.
 - `intentv2.md` is the V2 intent. It relaxes three V1 constraints (persistence, manual stage moves, working navigation) and keeps the rest. Its three "Decisions to Confirm" were built with their defaults and have not been explicitly confirmed by the author.
+- `intentv3.md` is the V3 intent. It allows a second AI call (the analysis) and keeps every other constraint. Its four "Decisions to Confirm" were also built with their defaults.
 - `README.md` is a reader-facing summary derived from `intentv1.md`.
 
 If you change scope, keep the three consistent, and do not edit `intentv1.md` unless asked.
@@ -45,7 +50,9 @@ If you change scope, keep the three consistent, and do not edit `intentv1.md` un
 - The evaluation returns exactly six fields: `problem`, `whoItAffects`, `potentialValue`, `missingEvidence`, `smallestNextStep`, `recommendation`.
 - `recommendation` is one of `Strong Candidate`, `Worth Exploring`, `Needs More Evidence`, `Low Value / Unclear`.
 - The Anthropic API key is read from an environment variable and used server-side only.
-- The only AI call is the evaluation at submission. AI does not move ideas between stages or produce analytics or impact figures.
+- There are exactly two AI calls: the evaluation at submission and the analysis on approval. Opening an idea never calls the AI. AI does not move ideas between stages or produce analytics or impact figures.
+- The move from Evidence to Prototype is the approval. There is no separate approve action or approver role.
+- The analysis is given only what is stored on the idea, must not invent systems, costs, or timelines, must name a simpler alternative, and is labelled as an AI-generated suggestion wherever shown.
 - Impact numbers are reviewer-entered estimates and are labelled as such.
 - Views start empty; there are no seeded or invented ideas. The Top Ideas panel is a static example list.
 - No authentication, roles, approvals, notifications, chat, workflow engine, multi-agent orchestration, database server, or Jira integration.
@@ -55,9 +62,9 @@ Each intent's stop condition is deliberate: once its acceptance criteria are evi
 ## Known gaps and deliberate differences
 
 - `concept.png` is the concept image `intentv1.md` refers to. The screen follows it in spirit but deliberately omits its search box, vote counts, and per-stage counts: none are in the intent, and they would be non-functional or invented data.
-- Live-API validation so far is the four example sentences from `intentv1.md` submitted through `POST /api/ideas` (all returned complete, contract-valid evaluations in roughly 5 to 13 seconds). The browser flows, failure states, and stage and outcome rules were checked against a stand-in API only.
-- Live evaluations tend to run longer than the "one to three short sentences" the system prompt asks for, especially `missingEvidence`.
-- The request does not opt into the API's server-side refusal `fallbacks`; a refusal is shown to the user as "couldn't be evaluated".
+- Live-API validation covers the four example sentences from `intentv1.md`: evaluation through `POST /api/ideas` (about 5 to 13 seconds each) and, with realistic reviewer notes, the analysis on approval (about 16 to 18 seconds each). The browser flows, failure states, and stage and outcome rules were checked against a stand-in API only.
+- Live output runs long: evaluations exceed the "one to three short sentences" asked for, and each analysis is around 600 words.
+- Neither model call opts into the API's server-side refusal `fallbacks`; a refusal is shown to the user as a plain "couldn't be evaluated" or "couldn't be produced" message.
 
 ## intent-driven-starter/
 
