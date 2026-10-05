@@ -1,0 +1,17 @@
+{
+  "name": "ai-suggestion-box",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ideas Workbench: an AI-powered employee suggestion workbench (V1)",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "zod": "^4.6.5"
+  }
+}

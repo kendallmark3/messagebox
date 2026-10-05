@@ -2,7 +2,21 @@
 
 An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work, and AI returns a short structured evaluation so good ideas can earn the right to proceed.
 
-> **Status:** V1 is specified but not yet built. This repository currently holds the intent ([intentv1.md](intentv1.md)) and a copy of the Intent-Driven Starter plugin ([intent-driven-starter/](intent-driven-starter/)). There is no application code yet.
+> **Status:** V1 is implemented: the submission screen and the AI evaluation work. The evaluation path has been exercised against a stand-in API; it has not yet been run against the live Anthropic API.
+
+## Run it locally
+
+Requires Node.js 20.12 or later.
+
+```bash
+npm install
+cp .env.example .env   # then put your Anthropic API key in .env
+npm start
+```
+
+Open http://localhost:3210. Set `PORT` in `.env` to use a different port.
+
+The API key is read by the server only. It is never sent to the browser, and `.env` is git-ignored.
 
 ## Product principle
 
@@ -51,7 +65,9 @@ In V1 a submitted suggestion starts at **Problem**. The other stages are shown f
 
 ## Visual direction
 
-The app should follow the supplied concept image and look like a polished enterprise workbench, good enough for an executive presentation:
+The app follows the concept image below in spirit and should look like a polished enterprise workbench, good enough for an executive presentation:
+
+![Concept image for the Ideas Workbench](concept.png)
 
 - dark navy navigation with a light main workspace
 - blue and orange accents
@@ -91,5 +107,8 @@ The whole experience should feel simpler than writing an email or preparing a Po
 
 | Path | What it is |
 | --- | --- |
-| [intentv1.md](intentv1.md) | The full V1 intent; the source of truth for this README |
+| [server.js](server.js) | Serves the page and makes the one Anthropic API call behind `POST /api/evaluate` |
+| [public/](public/) | The workbench screen: HTML, CSS, and browser script |
+| [INTENT.md](INTENT.md) | Implementation-ready intent that V1 was built from |
+| [intentv1.md](intentv1.md) | The original V1 intent; the source of truth for product meaning |
 | [intent-driven-starter/](intent-driven-starter/) | Copy of the Intent-Driven Starter plugin (skills, agents, hooks) used to build from the intent |

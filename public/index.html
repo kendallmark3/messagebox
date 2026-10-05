@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ideas Workbench</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 10h7M8.5 14h5"/></symbol>
+    <symbol id="i-flow" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.2"/><circle cx="5.5" cy="18.5" r="2.2"/><circle cx="18.5" cy="18.5" r="2.2"/><path d="M11 7l-4.5 9.500M13 7l4.5 9.5"/></symbol>
+    <symbol id="i-bars" viewBox="0 0 24 24"><path d="M5 20v-6M10 20V9M15 20v-8M20 20V5M3 20h19"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15M5 19c2-4 5-7 9-9"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.600l2.1 2.100M16.3 16.300l2.1 2.100M5.6 18.400l2.1-2.100M16.3 7.700l2.1-2.1"/></symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9.500A1.5 1.5 0 0 0 6.3 21h11.400a1.5 1.5 0 0 0 1.3-2.500L14 9V3M7.8 15h8.4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.500l4.5 4.500L19 7.5"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  </svg>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-mark"><use href="#i-bulb"/></svg>
+        <span class="brand-name">Ideas<br>Workbench</span>
+        <span class="brand-chip">AI</span>
+      </div>
+      <nav class="nav" aria-label="Main">
+        <a class="nav-item is-active" href="#submit" aria-current="page"><svg><use href="#i-plus"/></svg>Submit Idea</a>
+        <span class="nav-item is-inert" aria-disabled="true"><svg><use href="#i-list"/></svg>My Ideas</span>
+        <span class="nav-item is-inert" aria-disabled="true"><svg><use href="#i-flow"/></svg>Review Pipeline</span>
+        <span class="nav-item is-inert" aria-disabled="true"><svg><use href="#i-bars"/></svg>Analytics</span>
+        <span class="nav-item is-inert" aria-disabled="true"><svg><use href="#i-leaf"/></svg>Impact</span>
+      </nav>
+      <p class="sidebar-foot">Let good ideas earn the right to proceed.</p>
+    </aside>
+
+    <main class="main">
+      <header class="header">
+        <div>
+          <h1>Ideas Workbench</h1>
+          <p class="lede">Tell us about a problem or opportunity you see at work. You'll get a quick assessment of whether it's worth pursuing.</p>
+        </div>
+        <button type="button" class="btn btn-accent" id="new-idea">+ New Idea</button>
+      </header>
+
+      <div class="columns">
+        <section class="card" id="submit">
+          <form id="idea-form" novalidate>
+            <h2 class="card-title">Submit an Idea</h2>
+            <label class="prompt" for="suggestion">What's your idea or problem?</label>
+            <textarea id="suggestion" name="suggestion" rows="4" maxlength="4000"
+              placeholder="For example: We spend 10 hours every week reconciling three reports."></textarea>
+            <div class="form-row">
+              <span class="hint">Describe it the way you'd tell a colleague. You don't need a solution.</span>
+              <button type="submit" class="btn btn-primary" id="submit-btn" disabled>Submit Idea</button>
+            </div>
+          </form>
+        </section>
+
+        <aside class="card top-ideas" aria-labelledby="top-ideas-title">
+          <h2 class="card-title" id="top-ideas-title">Top Ideas</h2>
+          <ul>
+            <li>
+              <span class="tile tile-green"><svg><use href="#i-leaf"/></svg></span>
+              <span><span class="idea-name">Reduce Packaging Waste</span><span class="idea-tags">High impact · Sustainability</span></span>
+            </li>
+            <li>
+              <span class="tile tile-blue"><svg><use href="#i-gear"/></svg></span>
+              <span><span class="idea-name">Automate Customer Onboarding Checks</span><span class="idea-tags">Efficiency · Customer experience</span></span>
+            </li>
+            <li>
+              <span class="tile tile-orange"><svg><use href="#i-doc"/></svg></span>
+              <span><span class="idea-name">Simplify Monthly Reporting</span><span class="idea-tags">Efficiency · Finance</span></span>
+            </li>
+            <li>
+              <span class="tile tile-violet"><svg><use href="#i-copy"/></svg></span>
+              <span><span class="idea-name">Reduce Duplicate Data Entry</span><span class="idea-tags">Quality · Operations</span></span>
+            </li>
+          </ul>
+        </aside>
+      </div>
+
+      <section class="card pipeline" id="pipeline" aria-labelledby="pipeline-title">
+        <h2 class="card-title" id="pipeline-title">Idea Pipeline</h2>
+        <ol class="stages">
+          <li class="stage stage-problem is-current">
+            <span class="stage-dot"><svg><use href="#i-bulb"/></svg></span>
+            <span class="stage-name">Problem</span>
+            <span class="stage-note" id="stage-note">New ideas start here</span>
+          </li>
+          <li class="stage stage-evidence">
+            <span class="stage-dot"><svg><use href="#i-doc"/></svg></span>
+            <span class="stage-name">Evidence</span>
+            <span class="stage-note">Show that it matters</span>
+          </li>
+          <li class="stage stage-prototype">
+            <span class="stage-dot"><svg><use href="#i-gear"/></svg></span>
+            <span class="stage-name">Prototype</span>
+            <span class="stage-note">Test it cheaply</span>
+          </li>
+          <li class="stage stage-pilot">
+            <span class="stage-dot"><svg><use href="#i-flask"/></svg></span>
+            <span class="stage-name">Pilot</span>
+            <span class="stage-note">Try it with real users</span>
+          </li>
+          <li class="stage stage-investment">
+            <span class="stage-dot"><svg><use href="#i-bars"/></svg></span>
+            <span class="stage-name">Investment</span>
+            <span class="stage-note">Fund and scale it</span>
+          </li>
+        </ol>
+      </section>
+
+      <section class="card notice notice-error" id="error" role="alert" hidden>
+        <p id="error-text"></p>
+        <button type="button" class="btn btn-quiet" id="retry">Try again</button>
+      </section>
+
+      <section class="card notice" id="loading" aria-live="polite" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Evaluating your idea…</p>
+      </section>
+
+      <section class="card evaluation" id="evaluation" aria-live="polite" hidden>
+        <div class="evaluation-head">
+          <h2 class="card-title">Evaluation</h2>
+          <span class="badge" id="recommendation"></span>
+        </div>
+        <dl class="fields">
+          <div class="field">
+            <dt>Problem</dt>
+            <dd id="f-problem"></dd>
+          </div>
+          <div class="field">
+            <dt>Who it affects</dt>
+            <dd id="f-who"></dd>
+          </div>
+          <div class="field">
+            <dt>Potential value</dt>
+            <dd id="f-value"></dd>
+          </div>
+          <div class="field">
+            <dt>Missing evidence</dt>
+            <dd id="f-evidence"></dd>
+          </div>
+          <div class="field field-next">
+            <dt>Smallest next step</dt>
+            <dd id="f-next"></dd>
+          </div>
+        </dl>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
