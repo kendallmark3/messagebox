@@ -2,6 +2,8 @@
 
 Builds on [intentv1.md](intentv1.md), [INTENT.md](INTENT.md), and [intentv2.md](intentv2.md). Everything in V1 and V2 stays as built unless this file says otherwise.
 
+Status: implemented. The **As Built** section at the end records the decisions the implementation made.
+
 ## 1. Intent / Goal
 
 When an idea has gathered its evidence and a reviewer approves it to go further, the workbench runs an AI analysis and proposes a **potential architectural pattern** for how the idea might be built.
@@ -12,13 +14,11 @@ The product principle holds. Employees still submit problems and opportunities, 
 
 ## 2. Inputs / Context
 
-### Current state
+### State when this intent was written
 
-- V2 is implemented on the `feature/v2-idea-lifecycle` branch, which is pushed but not merged into `main`. V3 work starts from that branch.
-- [server.js](server.js) stores ideas in `data/ideas.json` and exposes the ideas API. Stage moves go one step at a time and need a note. [public/app.js](public/app.js) builds the views and the idea detail.
-- The only AI call is the evaluation at submission. Its six-field result is stored on the idea and never regenerated.
-- There is no concept of approval. Anyone can move an idea, and the move with its note is the only record of why.
-- The live Anthropic API has been validated for the evaluation call only.
+- V2 was implemented: [server.js](server.js) stored ideas in `data/ideas.json` and exposed the ideas API, with stage moves going one step at a time and needing a note. [public/app.js](public/app.js) built the views and the idea detail.
+- The only AI call was the evaluation at submission. Its six-field result was stored on the idea and never regenerated.
+- There was no concept of approval. Anyone could move an idea, and the move with its note was the only record of why.
 
 ### What approval means in V3
 
@@ -73,9 +73,9 @@ Rules for the content:
 
 - It starts automatically when an idea is moved from Evidence to Prototype.
 - The stage move succeeds whether or not the analysis does. A failed analysis never blocks or undoes an approval.
-- If it fails, the idea shows a plain error and a way to run it again.
+- If it fails, the idea shows a plain error. In Review Pipeline the error comes with a way to run it again.
 - A reviewer can run it again later, for example after new notes are added. The new result replaces the old one.
-- Moving an idea back to Evidence keeps the stored analysis.
+- Moving an idea back to Evidence keeps the stored analysis and keeps it visible, but it cannot be run again until the idea is at Prototype or beyond.
 - Ideas already at Prototype or beyond when V3 arrives have no analysis; a reviewer can run it for them by hand.
 
 ### Where it appears
@@ -84,7 +84,7 @@ Rules for the content:
 - The section is clearly labelled as an AI-generated suggestion to be checked by the people who will build it.
 - The controls to run it again appear only in Review Pipeline, alongside the other reviewer controls.
 - While it is being produced, the section shows a waiting state. The rest of the idea stays usable.
-- Review Pipeline marks which ideas at Prototype or beyond have an analysis.
+- Review Pipeline marks every idea that has an analysis.
 
 ## 4. Success Criteria
 
@@ -141,11 +141,77 @@ Report what was actually observed, including anything that failed or could not b
 
 Stop when an approved idea reliably gets a stored, readable potential architecture, the acceptance criteria are met with evidence, and V1 and V2 behavior is intact. Do not continue into diagrams, cost or effort estimates, comparison of multiple patterns, or generating prototype code.
 
-## Decisions to Confirm
+## Decisions Made
 
-Each has a default that will be used unless changed.
+Each was built with the default below; none was changed by the author.
 
-1. **Which move counts as "approved"?** Default: Evidence → Prototype, because a solution shape is most useful just before prototyping. The alternative is a later point, such as Pilot → Investment.
-2. **Automatic or on request?** Default: the analysis starts automatically on approval, with a manual run-again. The alternative is a button only, so no AI call is made unless a reviewer asks.
-3. **Who can see it?** Default: anyone who can open the idea, including the employee who submitted it. The alternative is reviewers only.
-4. **How technical should it be?** Default: plain language a business reviewer can follow, with pattern names explained. The alternative is a version written for engineers.
+1. **Which move counts as "approved"?** Evidence → Prototype, because a solution shape is most useful just before prototyping.
+2. **Automatic or on request?** The analysis starts automatically on approval, with a manual run-again.
+3. **Who can see it?** Anyone who can open the idea, including the employee who submitted it.
+4. **How technical should it be?** Plain language a business reviewer can follow, with pattern names explained.
+
+## As Built
+
+### The analysis call
+
+- The same model and method as the evaluation: `claude-opus-5-5` through `messages.parse`, with the analysis contract as a zod schema, `max_tokens` 16000, a 90-second timeout, and one retry. Effort is `medium`.
+- `components` is a list of `{ name, responsibility }`; `assumptions` and `risks` are lists of strings; the other fields are strings. `generatedAt` is added by the server, not the model.
+- The system prompt is in the appendix below.
+- The user message is built from the idea in this order: the heading "Employee's suggestion:" and the text; "Earlier evaluation:" with each of the six fields as `- field: value`; "Reviewer notes, oldest first:" with each move as `- From to To: note`, or `- none`; and, if recorded, "Recorded outcome:" with the description and the reviewer's hours estimate.
+- A result is stored only if it matches the schema and no text is blank, there is at least one component, and there is at least one assumption. Otherwise it counts as a failure.
+
+### Running and status
+
+- A forward move into Prototype saves the move, then starts the analysis in the background, so the move's response returns at once.
+- `POST /api/ideas/:id/analysis` starts a run on request. It returns 202 with the idea, 409 if the idea is below Prototype, and 409 if a run is already in progress.
+- Every idea returned by the API carries `analysisStatus` (`none`, `running`, `failed`, or `ready`) and `analysisError` (the message, when failed).
+- Running and failed states are held in memory only. After a restart a stored analysis is `ready`, and an idea with none is `none` and can be run by hand.
+- A successful run replaces `analysis` and is written to the idea store. A failed run leaves any earlier analysis in place.
+
+| Situation | Message |
+| --- | --- |
+| Below Prototype | A potential architecture is only produced once an idea reaches Prototype. |
+| Already running | A potential architecture is already being produced for this idea. |
+| API failure or incomplete result | The potential architecture couldn't be produced. Please try again. |
+| Refusal | A potential architecture couldn't be produced for this idea. |
+
+### Page
+
+- The section sits on the idea detail between Evaluation and Outcome.
+- While a run is in progress it shows a spinner with "Producing a potential architecture for this idea…", or "Producing a new potential architecture…" when an earlier one is still displayed beneath it. The page asks the server for the idea every two seconds and redraws only this section, so a note being typed elsewhere on the page is kept.
+- The card is titled "Potential architecture" with a violet "AI-generated suggestion" pill, and the line "Produced <date> from this idea's suggestion, evaluation, and reviewer notes. Check it with the people who will build it."
+- Its fields, in order: Proposed pattern (the pattern name in bold with the summary beneath, full width, blue tint); Why it fits (full width); Main parts (full width, each as a bold name and its responsibility); Data and systems it would touch; A simpler alternative; Assumptions; Risks; Smallest first prototype (full width).
+- In Review Pipeline, for an idea at Prototype or beyond, the card ends with "Run the analysis again"; an idea with no analysis shows "No analysis has been produced for this idea yet." and "Run the analysis"; a failure shows "Try again".
+- From My Ideas and Impact the section is read-only.
+- On the Review Pipeline board, an idea with an analysis carries a violet "Architecture" pill beside its recommendation.
+
+### How it was validated
+
+- Against the stand-in API, in headless Chrome with a separate idea store: the trigger on approval, the waiting state, a failed result, a malformed result, run-again, refusals below Prototype and during a run, moving back, refresh, and restart. The V1 and V2 checks were repeated on the V3 code.
+- Against the live API: the four example ideas from intentv1.md were taken to Prototype with realistic reviewer notes. Each analysis arrived in 16 to 18 seconds, used the reviewer notes, named a simpler alternative, listed assumptions, and did not propose AI. Each ran to about 600 words.
+
+## Appendix: Analysis System Prompt
+
+```text
+You propose a potential architectural pattern for an employee idea that has been approved to move into prototyping.
+
+You are given everything recorded about the idea: the employee's original suggestion, an earlier evaluation, the reviewers' notes from each stage move, and an outcome if one was recorded. That is all you know. You have no knowledge of the organisation's systems, teams, budgets, or tools beyond what those records say.
+
+Your reader is a business reviewer and the people who will build the prototype. Write in plain language, and when you name a pattern, name it in words a non-engineer can follow.
+
+Fill in each field:
+- summary: what a solution would need to do, in two or three sentences.
+- pattern: a short plain-language name for the solution shape you propose.
+- whyItFits: why that shape suits this problem, given what was written and what the reviewers recorded.
+- components: three to six main parts, each with a name and a one-sentence responsibility.
+- dataAndIntegrations: what information and existing systems it would need to touch, as far as the records reveal. Say plainly what is not known.
+- simplerAlternative: the cheapest option that might be enough. Consider a change to the process with no new software.
+- assumptions: what you had to assume because the records did not say. If you assumed nothing, give one entry saying so.
+- risks: the main things that could make this the wrong shape.
+- firstPrototype: the smallest thing to build or try that would test the pattern.
+
+Take the reviewers' notes into account; they are the evidence. Do not contradict a fact recorded there.
+Do not invent systems, vendors, team names, costs, or timelines. Put anything unknown under assumptions rather than stating it as fact.
+Do not reach for AI by default. Propose AI only where the problem genuinely calls for it.
+This is a starting point for discussion, not a design. Keep the whole thing readable in a couple of minutes.
+```
