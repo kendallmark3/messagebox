@@ -1,0 +1,26 @@
+Title:
+[A short name for the idea]
+
+Problem:
+[What is happening today? Describe it the way you'd tell a colleague.]
+
+Who it affects:
+[Who lives with this problem, and roughly how many people?]
+
+Evidence:
+[What have you measured or seen that shows it matters? Numbers, examples, complaints.]
+
+Why it is worth prototyping:
+[What makes you confident enough to try something? Who agrees?]
+
+Prototype:
+[The smallest thing that was tried, or could be tried, and what it showed.]
+
+Pilot:
+[Who used it for real, for how long, and what happened?]
+
+Outcome:
+[What it has led to so far.]
+
+Hours saved per week:
+[Your best estimate, as a number]

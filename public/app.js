@@ -7,7 +7,7 @@ const STAGES = [
 ];
 const STAGE_NAMES = STAGES.map((stage) => stage.name);
 const OUTCOME_STAGES = ["Pilot", "Investment"];
-// A potential architecture exists only for ideas approved into this stage or beyond.
+// An analysis exists only for ideas approved into this stage or beyond.
 const ANALYSIS_STAGE_INDEX = STAGE_NAMES.indexOf("Prototype");
 
 const FIELDS = [
@@ -306,7 +306,7 @@ async function renderPipeline() {
                 "a",
                 { class: "board-card", href: `#/pipeline/${idea.id}` },
                 h("span", { class: "board-card-text" }, idea.suggestion.length > 90 ? `${idea.suggestion.slice(0, 90).trimEnd()}…` : idea.suggestion),
-                h("span", { class: "board-card-tags" }, badge(idea.evaluation.recommendation), idea.analysis && h("span", { class: "badge badge-ai" }, "Architecture"))
+                h("span", { class: "board-card-tags" }, badge(idea.evaluation.recommendation), idea.analysis && h("span", { class: "badge badge-ai" }, "Analysis"))
               )
             )
       );
@@ -384,7 +384,7 @@ function architectureSection(view, idea) {
           "section",
           { class: "card notice", "aria-live": "polite" },
           h("span", { class: "spinner", "aria-hidden": "true" }),
-          h("p", null, analysis ? "Producing a new potential architecture…" : "Producing a potential architecture for this idea…")
+          h("p", null, analysis ? "Producing a new analysis…" : "Producing an analysis for this idea…")
         )
       );
       setTimeout(poll, 2000);
@@ -400,13 +400,15 @@ function architectureSection(view, idea) {
       );
     }
     if (analysis) {
-      parts.push(architectureCard(analysis, canRun && eligible && status !== "running" && runRow("Run the analysis again")));
+      // Analyses stored before the evidence-led format have no recommendation.
+      const card = analysis.recommendation ? analysisCard : legacyArchitectureCard;
+      parts.push(card(analysis, canRun && eligible && status !== "running" && runRow("Run the analysis again")));
     } else if (status === "none" && eligible && canRun) {
       parts.push(
         h(
           "section",
           { class: "card" },
-          h("h2", { class: "card-title" }, "Potential architecture"),
+          h("h2", { class: "card-title" }, "Analysis"),
           h("p", { class: "hint" }, "No analysis has been produced for this idea yet."),
           runRow("Run the analysis")
         )
@@ -419,14 +421,70 @@ function architectureSection(view, idea) {
   return container;
 }
 
-function architectureCard(analysis, footer) {
+const INVESTMENT_TRIGGER = "Build only if evidence shows the next increment will produce enough measurable value to justify its cost and operational burden.";
+
+const RECOMMENDATION_CLASS = {
+  "Do not build yet": "verdict-hold",
+  "Change the process first": "verdict-process",
+  "Build the smallest next step": "verdict-build",
+};
+
+function analysisCard(analysis, footer) {
+  const { evidence, ifJustified } = analysis;
+  const bullets = (items) => h("ul", { class: "plain-list" }, items.map((item) => h("li", null, item)));
+  const group = (label, hint, items) =>
+    h("div", { class: "field" }, h("dt", null, label), h("dd", null, h("p", { class: "hint" }, hint), items.length ? bullets(items) : h("p", { class: "none" }, "Nothing in this group.")));
+
+  return h(
+    "section",
+    { class: "card evaluation" },
+    h("div", { class: "evaluation-head" }, h("h2", { class: "card-title" }, "Analysis"), h("span", { class: "badge badge-ai" }, "AI-generated suggestion")),
+    h("p", { class: "hint ai-note" }, `Produced ${formatDate(analysis.generatedAt)} from this idea's suggestion, evaluation, and reviewer notes. Check it with the people who would act on it.`),
+    h(
+      "div",
+      { class: `verdict ${RECOMMENDATION_CLASS[analysis.recommendation] || "verdict-hold"}` },
+      h("span", { class: "verdict-label" }, "Recommendation"),
+      h("strong", { class: "verdict-text" }, analysis.recommendation),
+      h("p", { class: "verdict-move" }, h("strong", null, "Smallest next move: "), analysis.nextMove),
+      h("p", null, analysis.reason)
+    ),
+    h(
+      "div",
+      { class: "trigger" },
+      h("p", null, h("strong", null, "Investment trigger: "), INVESTMENT_TRIGGER),
+      h("p", null, h("strong", null, "For this idea, that means: "), analysis.buildTrigger)
+    ),
+    h("h3", { class: "sub-title" }, "What the evidence says"),
+    h(
+      "dl",
+      { class: "fields fields-three" },
+      group("Known", "Measured or directly observed.", evidence.known),
+      group("Reported but unverified", "Stated without saying how it was measured.", evidence.reportedUnverified),
+      group("Inferred", "The analysis's own reading.", evidence.inferred)
+    ),
+    h(
+      "div",
+      { class: "conditional" },
+      h("h3", { class: "sub-title" }, "If automation is justified…"),
+      h("p", null, h("strong", null, `${ifJustified.pattern}. `), ifJustified.summary),
+      h("ul", { class: "plain-list" }, ifJustified.components.map((part) => h("li", null, h("strong", null, `${part.name}: `), part.responsibility))),
+      h("p", null, h("strong", null, "It would touch: "), ifJustified.dataAndSystems)
+    ),
+    h("h3", { class: "sub-title" }, "Risks"),
+    analysis.risks.length ? bullets(analysis.risks) : h("p", { class: "none" }, "None identified."),
+    footer
+  );
+}
+
+// The V3 layout, kept so analyses stored before the evidence-led format still display.
+function legacyArchitectureCard(analysis, footer) {
   const block = (label, body, extraClass) => h("div", { class: `field${extraClass ? ` ${extraClass}` : ""}` }, h("dt", null, label), h("dd", null, body));
   const bullets = (items) => h("ul", { class: "plain-list" }, items.map((item) => h("li", null, item)));
   return h(
     "section",
     { class: "card evaluation" },
     h("div", { class: "evaluation-head" }, h("h2", { class: "card-title" }, "Potential architecture"), h("span", { class: "badge badge-ai" }, "AI-generated suggestion")),
-    h("p", { class: "hint ai-note" }, `Produced ${formatDate(analysis.generatedAt)} from this idea's suggestion, evaluation, and reviewer notes. Check it with the people who will build it.`),
+    h("p", { class: "hint ai-note" }, `Produced ${formatDate(analysis.generatedAt)}, before the evidence-led format. Run the analysis again from Review Pipeline to update it.`),
     h(
       "dl",
       { class: "fields" },

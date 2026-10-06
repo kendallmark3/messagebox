@@ -16,7 +16,7 @@ Employees submit problems and opportunities, not technologies. The system helps 
 
 - The repository was greenfield: it held intentv1.md, README.md, and a copy of the Intent-Driven Starter plugin, with no application code or build tooling.
 - There was no existing Anthropic integration to reuse, so the simplest direct Anthropic API integration is used.
-- The concept image that intentv1.md refers to is [concept.png](concept.png). The screen follows it in spirit, within the Visual Direction and Constraints below.
+- The concept image that intentv1.md refers to is [concept.png](../../concept.png). The screen follows it in spirit, within the Visual Direction and Constraints below.
 
 ### Runtime input
 

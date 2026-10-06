@@ -46,38 +46,55 @@ const Evaluation = z.object({
 });
 
 const Analysis = z.object({
-  summary: z.string(),
-  pattern: z.string(),
-  whyItFits: z.string(),
-  components: z.array(z.object({ name: z.string(), responsibility: z.string() })),
-  dataAndIntegrations: z.string(),
-  simplerAlternative: z.string(),
-  assumptions: z.array(z.string()),
+  recommendation: z.enum(["Do not build yet", "Change the process first", "Build the smallest next step"]),
+  nextMove: z.string(),
+  reason: z.string(),
+  evidence: z.object({
+    known: z.array(z.string()),
+    reportedUnverified: z.array(z.string()),
+    inferred: z.array(z.string()),
+  }),
+  buildTrigger: z.string(),
+  ifJustified: z.object({
+    pattern: z.string(),
+    summary: z.string(),
+    components: z.array(z.object({ name: z.string(), responsibility: z.string() })),
+    dataAndSystems: z.string(),
+  }),
   risks: z.array(z.string()),
-  firstPrototype: z.string(),
 });
 
-const ANALYSIS_PROMPT = `You propose a potential architectural pattern for an employee idea that has been approved to move into prototyping.
+const ANALYSIS_PROMPT = `You advise on the smallest next move for an employee idea that has been approved to move toward prototyping.
+
+Your job is not to design a solution. It is to say what the evidence justifies doing next, and whether anything needs to be built at all. Do not architect the imagined solution; architect the smallest next move the evidence justifies. Moving along the pipeline should mean stronger evidence, not bigger software.
 
 You are given everything recorded about the idea: the employee's original suggestion, an earlier evaluation, the reviewers' notes from each stage move, and an outcome if one was recorded. That is all you know. You have no knowledge of the organisation's systems, teams, budgets, or tools beyond what those records say.
 
-Your reader is a business reviewer and the people who will build the prototype. Write in plain language, and when you name a pattern, name it in words a non-engineer can follow.
+Your reader is a business reviewer. Write in plain language, in short sentences.
 
-Fill in each field:
-- summary: what a solution would need to do, in two or three sentences.
-- pattern: a short plain-language name for the solution shape you propose.
-- whyItFits: why that shape suits this problem, given what was written and what the reviewers recorded.
-- components: three to six main parts, each with a name and a one-sentence responsibility.
-- dataAndIntegrations: what information and existing systems it would need to touch, as far as the records reveal. Say plainly what is not known.
-- simplerAlternative: the cheapest option that might be enough. Consider a change to the process with no new software.
-- assumptions: what you had to assume because the records did not say. If you assumed nothing, give one entry saying so.
-- risks: the main things that could make this the wrong shape.
-- firstPrototype: the smallest thing to build or try that would test the pattern.
+First sort the evidence. Each item is one short sentence that says where it comes from (the suggestion, a named stage note, or the outcome).
+- evidence.known: facts the records state with a measurement, a count, a sample, or a direct observation.
+- evidence.reportedUnverified: claims the records make without saying how they were measured or what they refer to. This includes unclear or garbled reviewer notes, a technology that is named but not described, and money or savings figures with no backing. Quote an unclear note as written; do not interpret it into a fact.
+- evidence.inferred: what you yourself are guessing or reading between the lines.
+Use an empty list where there is nothing to put in a group. Do not list the same item twice.
 
-Take the reviewers' notes into account; they are the evidence. Do not contradict a fact recorded there.
-Do not invent systems, vendors, team names, costs, or timelines. Put anything unknown under assumptions rather than stating it as fact.
-Do not reach for AI by default. Propose AI only where the problem genuinely calls for it.
-This is a starting point for discussion, not a design. Keep the whole thing readable in a couple of minutes.`;
+Then decide.
+- recommendation: "Do not build yet" when the next step should be to measure or verify something; "Change the process first" when a change with no new software is the obvious next thing to try; "Build the smallest next step" only when known evidence shows a process change will not be enough.
+- nextMove: the smallest next move the evidence justifies, concrete enough to start this week. Say exactly what to measure, change, or build, and with whom.
+- reason: why that is the right move, in two or three sentences that point at the known evidence.
+- buildTrigger: the specific, measurable evidence that would justify building something for this idea.
+
+Then, briefly and conditionally, describe what could be built if that trigger were met.
+- ifJustified.pattern: a short plain-language name for the solution shape.
+- ifJustified.summary: what it would do, in one or two sentences.
+- ifJustified.components: two to four main parts, each with a name and a one-sentence responsibility.
+- ifJustified.dataAndSystems: what it would need to touch, as far as the known evidence reveals. Say plainly what is not known.
+
+- risks: up to three things that could make your recommendation the wrong call.
+
+Only known evidence carries weight. Base the recommendation, the reason, and the conditional design on known items. If a sentence leans on an unverified or inferred item, say so in that sentence.
+Do not invent systems, vendors, team names, costs, or timelines. Do not reach for AI by default.
+Keep it short: about 300 words across all fields, readable in a minute.`;
 
 const SYSTEM_PROMPT = `You evaluate employee suggestions for an internal ideas workbench.
 
@@ -220,6 +237,7 @@ function describeIdea(idea) {
 }
 
 const isBlank = (text) => text.trim() === "";
+const ANALYSIS_FAILURE = "The analysis couldn't be produced. Please try again.";
 
 // Starts an analysis in the background. The caller has already checked the stage.
 function startAnalysis(idea) {
@@ -229,19 +247,19 @@ function startAnalysis(idea) {
     content: describeIdea(idea),
     schema: Analysis,
     effort: "medium",
-    failure: "The potential architecture couldn't be produced. Please try again.",
-    refusal: "A potential architecture couldn't be produced for this idea.",
+    failure: ANALYSIS_FAILURE,
+    refusal: "An analysis couldn't be produced for this idea.",
   })
     .then(async (analysis) => {
-      const texts = [analysis.summary, analysis.pattern, analysis.whyItFits, analysis.dataAndIntegrations, analysis.simplerAlternative, analysis.firstPrototype];
+      const { evidence, ifJustified } = analysis;
+      const lists = [evidence.known, evidence.reportedUnverified, evidence.inferred, analysis.risks];
       const incomplete =
-        texts.some(isBlank) ||
-        analysis.components.length === 0 ||
-        analysis.components.some((part) => isBlank(part.name) || isBlank(part.responsibility)) ||
-        analysis.assumptions.length === 0 ||
-        analysis.assumptions.some(isBlank) ||
-        analysis.risks.some(isBlank);
-      if (incomplete) throw new RequestError(502, "The potential architecture couldn't be produced. Please try again.");
+        [analysis.nextMove, analysis.reason, analysis.buildTrigger, ifJustified.pattern, ifJustified.summary, ifJustified.dataAndSystems].some(isBlank) ||
+        lists.some((list) => list.some(isBlank)) ||
+        evidence.known.length + evidence.reportedUnverified.length === 0 ||
+        ifJustified.components.length === 0 ||
+        ifJustified.components.some((part) => isBlank(part.name) || isBlank(part.responsibility));
+      if (incomplete) throw new RequestError(502, ANALYSIS_FAILURE);
       idea.analysis = { ...analysis, generatedAt: new Date().toISOString() };
       await saveIdeas();
       analysisRuns.delete(idea.id);
@@ -250,7 +268,7 @@ function startAnalysis(idea) {
       if (!(error instanceof RequestError)) console.error("Analysis failed:", error);
       analysisRuns.set(idea.id, {
         state: "failed",
-        message: error instanceof RequestError ? error.message : "The potential architecture couldn't be produced. Please try again.",
+        message: error instanceof RequestError ? error.message : ANALYSIS_FAILURE,
       });
     });
 }
@@ -258,10 +276,10 @@ function startAnalysis(idea) {
 function requestAnalysis(id) {
   const idea = findIdea(id);
   if (STAGES.indexOf(idea.stage) < STAGES.indexOf(ANALYSIS_STAGE)) {
-    throw new RequestError(409, `A potential architecture is only produced once an idea reaches ${ANALYSIS_STAGE}.`);
+    throw new RequestError(409, `An analysis is only produced once an idea reaches ${ANALYSIS_STAGE}.`);
   }
   if (analysisRuns.get(id)?.state === "running") {
-    throw new RequestError(409, "A potential architecture is already being produced for this idea.");
+    throw new RequestError(409, "An analysis is already being produced for this idea.");
   }
   startAnalysis(idea);
   return idea;
