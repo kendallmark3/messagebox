@@ -2,7 +2,7 @@
 
 An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work. AI returns a short structured evaluation, the idea is kept and moved through a pipeline as it earns it, and once it is approved for prototyping the workbench says what the evidence justifies doing next.
 
-> **Status:** release candidate (git tag `candidate`). Implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 (analysis on approval), and V5 (the evidence-led form of that analysis). V4 (submitting from a template) is written as an intent but not yet built. Both AI calls have been run against the live Anthropic API with the four example sentences below.
+> **Status:** release candidate (git tag `candidate`). Implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 (analysis on approval), V5 (the evidence-led form of that analysis), and V6 (an evidence gate on every forward move). V4 (submitting from a template) is written as an intent but not yet built. All three AI calls have been run against the live Anthropic API.
 
 ## Run it locally
 
@@ -58,11 +58,26 @@ Every idea sits somewhere on this path, starting at Problem:
 
 ### My Ideas
 
-The ideas submitted from this browser, newest first. Each opens to its evaluation, its stage, and its history. There is no sign-in, so "mine" means "from this browser".
+The ideas submitted from this browser, newest first. Each opens to its evaluation, its stage, and its history. There is no sign-in, so "mine" means "from this browser". You can delete any of your own ideas from here; it asks once before deleting, and a deleted idea is gone for good.
 
 ### Review Pipeline
 
 All ideas grouped by stage. Anyone can open an idea and move it one stage forward or back; a short note is required and is kept in the idea's history. For an idea at Pilot or Investment, the reviewer can also record an outcome.
+
+### The evidence gate
+
+Every forward move is checked against a fixed bar for the next stage, so an idea advances because its evidence got stronger, not because someone typed "approved".
+
+| Move | The bar |
+| --- | --- |
+| Problem → Evidence | Something about the problem has been measured or counted, not only asserted. |
+| Evidence → Prototype | The measurements show the problem is big enough to be worth a small test. |
+| Prototype → Pilot | A small test has been run and its result is recorded. |
+| Pilot → Investment | Real users tried it over a stated period and the measured result is recorded. |
+
+- If the record meets the bar, the move is saved along with the evidence it rested on.
+- If not, nothing is saved, and the reviewer is told the one thing that is missing. They can add it, or move the idea anyway with a reason.
+- Overrides are recorded in the idea's history and marked on the board. The gate never blocks a person outright.
 
 ### Analysis on approval
 
@@ -106,7 +121,7 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 
 | Path | What it is |
 | --- | --- |
-| [server.js](server.js) | Serves the page, stores ideas, and makes the two Anthropic API calls: evaluation on submission and analysis on approval |
+| [server.js](server.js) | Serves the page, stores ideas, and makes the three Anthropic API calls: evaluation on submission, the evidence check on forward moves, and analysis on approval |
 | [public/](public/) | The workbench screens: HTML, CSS, and browser script |
 | [templates/intents/](templates/intents/) | The intent files the app was built from (see below) |
 | [templates/](templates/) | A blank idea template and a filled-in example to paste into Submit Idea |
@@ -124,5 +139,6 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 | [intentv3.md](templates/intents/intentv3.md) | V3: an AI analysis for approved ideas; its contract and prompt are superseded by V5 |
 | [intentv4.md](templates/intents/intentv4.md) | V4: submitting from a template. Not yet built |
 | [intentv5.md](templates/intents/intentv5.md) | V5: the evidence-led analysis, with its as-built decisions and the analysis prompt |
+| [intentv6.md](templates/intents/intentv6.md) | V6: the evidence gate on forward moves, with its as-built decisions and the gate prompt |
 
-The implemented intents, with their As Built sections, are meant to be enough to rebuild the app: INTENT.md, then intentv2.md, intentv3.md, and intentv5.md.
+The implemented intents, with their As Built sections, are meant to be enough to rebuild the app: INTENT.md, then intentv2.md, intentv3.md, intentv5.md, and intentv6.md.

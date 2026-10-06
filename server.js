@@ -66,6 +66,45 @@ const Analysis = z.object({
   risks: z.array(z.string()),
 });
 
+// The bar an idea must meet to move into each stage. Fixed text, shown to the reviewer.
+const GATE_BARS = {
+  Evidence: "Something about the problem has been measured or counted, not only asserted.",
+  Prototype: "The measurements show the problem is big enough to be worth a small test.",
+  Pilot: "A small test has been run and its result is recorded.",
+  Investment: "Real users tried it over a stated period and the measured result is recorded.",
+};
+
+const Gate = z.object({
+  verdict: z.enum(["Meets the bar", "Not yet"]),
+  reason: z.string(),
+  known: z.array(z.string()),
+  unverified: z.array(z.string()),
+  missing: z.string(),
+});
+
+const GATE_PROMPT = `You check whether an employee idea has earned a move to the next stage of a pipeline: Problem, Evidence, Prototype, Pilot, Investment.
+
+Each move has a bar. Moving along the pipeline should mean stronger evidence, not more enthusiasm. A reviewer wants to move an idea forward and has written a note. Judge whether what is recorded meets the bar for this move.
+
+You are given the idea's record (the employee's suggestion, an earlier evaluation, earlier reviewer notes, and any outcome), the proposed move, the bar for it, and the reviewer's new note. That is all you know.
+
+What counts:
+- Only measured, counted, or directly observed facts count as evidence: a number with what it measures, a sample, a duration, a recorded result.
+- Evidence anywhere in the record counts, not only in the new note. The note does not have to repeat what the suggestion or an earlier note already established.
+- Approval, opinion, enthusiasm, seniority, and intention are not evidence. "Approved", "looks good", "management wants this", and "we will build it" establish nothing.
+- The earlier evaluation is commentary, not evidence.
+- If a note is unclear or garbled, quote it as written under unverified. Do not interpret it into a fact.
+
+Fill in:
+- verdict: "Meets the bar" if the recorded evidence meets the bar for this move, otherwise "Not yet".
+- reason: why, in one or two plain sentences.
+- known: the recorded evidence your verdict rests on. Each item is one short sentence that says where it comes from (the suggestion, a named stage note, the new note, or the outcome). Empty if there is none.
+- unverified: claims in the new note or the record that do not count, quoted as written. Empty if there are none.
+- missing: when the verdict is "Not yet", the one thing to go and get, said concretely enough to act on. One or two sentences, not a list. Leave it empty when the bar is met.
+
+Be neither a pushover nor a nag. If the bar is plainly met, say so and do not ask for more. If it is not, ask for the single most useful thing. Judge this move only, not the stages after it.
+Do not invent facts. Keep every field short.`;
+
 const ANALYSIS_PROMPT = `You advise on the smallest next move for an employee idea that has been approved to move toward prototyping.
 
 Your job is not to design a solution. It is to say what the evidence justifies doing next, and whether anything needs to be built at all. Do not architect the imagined solution; architect the smallest next move the evidence justifies. Moving along the pipeline should mean stronger evidence, not bigger software.
@@ -124,9 +163,20 @@ class RequestError extends Error {
 // after a restart an unfinished run is simply absent and can be started again.
 const analysisRuns = new Map();
 
+// The last "Not yet" result per idea, so moving anyway records the result the reviewer was shown
+// instead of running the check again. Also marks ideas with a check in progress.
+const gateResults = new Map();
+const gateRuns = new Set();
+
 function present(idea) {
   const run = analysisRuns.get(idea.id);
-  return { ...idea, analysisStatus: run?.state ?? (idea.analysis ? "ready" : "none"), analysisError: run?.message ?? null };
+  const next = STAGES[STAGES.indexOf(idea.stage) + 1];
+  return {
+    ...idea,
+    analysisStatus: run?.state ?? (idea.analysis ? "ready" : "none"),
+    analysisError: run?.message ?? null,
+    nextGate: next ? { to: next, bar: GATE_BARS[next] } : null,
+  };
 }
 
 // Ideas live in memory and are written to one JSON file after every change.
@@ -246,7 +296,9 @@ function describeIdea(idea) {
     ...Object.entries(idea.evaluation).map(([key, value]) => `- ${key}: ${value}`),
     "",
     "Reviewer notes, oldest first:",
-    ...(idea.history.length ? idea.history.map((entry) => `- ${entry.from} to ${entry.to}: ${entry.note}`) : ["- none"]),
+    ...(idea.history.length
+      ? idea.history.map((entry) => `- ${entry.from} to ${entry.to}: ${entry.note}${entry.override ? " (moved without meeting the evidence bar)" : ""}`)
+      : ["- none"]),
   ];
   if (idea.outcome) {
     lines.push("", `Recorded outcome: ${idea.outcome.description} (reviewer estimate: ${idea.outcome.hoursSavedPerWeek} hours saved per week)`);
@@ -256,6 +308,7 @@ function describeIdea(idea) {
 
 const isBlank = (text) => text.trim() === "";
 const ANALYSIS_FAILURE = "The analysis couldn't be produced. Please try again.";
+const GATE_FAILURE = "The evidence check couldn't be run.";
 
 // Starts an analysis in the background. The caller has already checked the stage.
 function startAnalysis(idea) {
@@ -278,6 +331,7 @@ function startAnalysis(idea) {
         ifJustified.components.length === 0 ||
         ifJustified.components.some((part) => isBlank(part.name) || isBlank(part.responsibility));
       if (incomplete) throw new RequestError(502, ANALYSIS_FAILURE);
+      if (!ideas.includes(idea)) return;
       idea.analysis = { ...analysis, generatedAt: new Date().toISOString() };
       await saveIdeas();
       analysisRuns.delete(idea.id);
@@ -351,24 +405,98 @@ async function createIdea(body) {
   return idea;
 }
 
+// Asks the model whether the record plus the new note meets the bar for the move.
+async function checkGate(idea, target, note) {
+  const gate = await askClaude({
+    system: GATE_PROMPT,
+    content: [
+      describeIdea(idea),
+      "",
+      `Proposed move: ${idea.stage} to ${target}`,
+      `Bar for this move: ${GATE_BARS[target]}`,
+      "",
+      "Reviewer's new note for this move:",
+      note,
+    ].join("\n"),
+    schema: Gate,
+    effort: "low",
+    failure: GATE_FAILURE,
+    refusal: GATE_FAILURE,
+  });
+  if (isBlank(gate.reason) || gate.known.some(isBlank) || gate.unverified.some(isBlank)) throw new RequestError(502, GATE_FAILURE);
+  // A pass has to rest on something; one that lists no evidence does not count.
+  if (gate.verdict === "Meets the bar" && gate.known.length === 0) {
+    gate.verdict = "Not yet";
+    gate.missing = gate.missing.trim() || "The check found no measured evidence to rest this move on. Record what was measured or observed.";
+  }
+  if (gate.verdict === "Not yet" && isBlank(gate.missing)) throw new RequestError(502, GATE_FAILURE);
+  if (gate.verdict === "Meets the bar") gate.missing = "";
+  return { ...gate, checkedAt: new Date().toISOString() };
+}
+
+// Returns { idea, moved, gate, checkError }. Only this function decides whether a move is saved.
 async function moveIdea(id, body) {
   const idea = findIdea(id);
   if (body?.direction !== "forward" && body?.direction !== "back") {
     throw new RequestError(400, "Choose whether to move the idea forward or back.");
   }
+  const forward = body.direction === "forward";
   const note = requireText(body.note, "A note", MAX_NOTE_CHARS);
-  const target = STAGES[STAGES.indexOf(idea.stage) + (body.direction === "forward" ? 1 : -1)];
+  const overrideReason = body.overrideReason == null ? null : requireText(body.overrideReason, "A reason for moving anyway", MAX_NOTE_CHARS);
+  const target = STAGES[STAGES.indexOf(idea.stage) + (forward ? 1 : -1)];
   if (!target) {
-    throw new RequestError(409, `An idea at ${idea.stage} cannot move ${body.direction === "forward" ? "forward" : "back"}.`);
+    throw new RequestError(409, `An idea at ${idea.stage} cannot move ${forward ? "forward" : "back"}.`);
   }
-  idea.history.push({ from: idea.stage, to: target, note, at: new Date().toISOString() });
+
+  const entry = { from: idea.stage, to: target, note, at: null };
+  if (forward) {
+    if (gateRuns.has(id)) throw new RequestError(409, "The evidence for this idea is already being checked.");
+    const shown = gateResults.get(id);
+    let gate = overrideReason && shown?.from === idea.stage && shown.note === note ? shown.gate : undefined;
+    let checkError = null;
+    if (!gate) {
+      gateRuns.add(id);
+      try {
+        gate = await checkGate(idea, target, note);
+      } catch (error) {
+        if (!(error instanceof RequestError)) throw error;
+        checkError = error.message;
+      } finally {
+        gateRuns.delete(id);
+      }
+    }
+    const met = gate?.verdict === "Meets the bar";
+    if (!met && !overrideReason) {
+      if (gate) gateResults.set(id, { from: idea.stage, note, gate });
+      return { idea, moved: false, gate: gate ?? null, checkError };
+    }
+    entry.gate = gate ?? { verdict: "Not checked", reason: checkError, known: [], unverified: [], missing: "", checkedAt: null };
+    entry.override = met ? null : overrideReason;
+    gateResults.delete(id);
+  }
+
+  entry.at = new Date().toISOString();
+  idea.history.push(entry);
   idea.stage = target;
   await saveIdeas();
   // The move is already saved; the analysis can fail without affecting it.
-  if (body.direction === "forward" && target === ANALYSIS_STAGE && analysisRuns.get(id)?.state !== "running") {
+  if (forward && target === ANALYSIS_STAGE && analysisRuns.get(id)?.state !== "running") {
     startAnalysis(idea);
   }
-  return idea;
+  return { idea, moved: true, gate: entry.gate ?? null, checkError: null };
+}
+
+// Only the browser that submitted an idea may delete it. There is no sign-in, so this
+// is a guard against accidents, not a security boundary.
+async function deleteIdea(id, submitterId) {
+  const idea = findIdea(id);
+  if (!submitterId || idea.submitterId !== submitterId) {
+    throw new RequestError(403, "Only the person who submitted an idea can delete it.");
+  }
+  ideas = ideas.filter((candidate) => candidate.id !== id);
+  analysisRuns.delete(id);
+  gateResults.delete(id);
+  await saveIdeas();
 }
 
 async function recordOutcome(id, body) {
@@ -401,8 +529,13 @@ async function handleApi(req, res, pathname, searchParams) {
       return sendJson(res, 201, { idea: present(await createIdea(await readJsonBody(req))) });
     case "GET /:id":
       return sendJson(res, 200, { idea: present(findIdea(id)) });
-    case "POST /:id/stage":
-      return sendJson(res, 200, { idea: present(await moveIdea(id, await readJsonBody(req))) });
+    case "POST /:id/stage": {
+      const result = await moveIdea(id, await readJsonBody(req));
+      return sendJson(res, 200, { ...result, idea: present(result.idea) });
+    }
+    case "DELETE /:id":
+      await deleteIdea(id, searchParams.get("submitterId"));
+      return sendJson(res, 200, { deleted: true });
     case "PUT /:id/outcome":
       return sendJson(res, 200, { idea: present(await recordOutcome(id, await readJsonBody(req))) });
     case "POST /:id/analysis":
