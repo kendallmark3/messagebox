@@ -2,7 +2,7 @@
 
 An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work. AI returns a short structured evaluation, the idea is kept and moved through a pipeline as it earns it, and once it is approved for prototyping the workbench says what the evidence justifies doing next.
 
-> **Status:** release candidate (git tag `candidate`). Implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 (analysis on approval), V4 (submitting from a template), V5 (the evidence-led form of that analysis), V6 (an evidence gate on every forward move), and V7 (a prototype admin approval before Investment). All three AI calls have been run against the live Anthropic API.
+> **Status:** prototype complete. Seven intents are implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 and V5 (an evidence-led analysis on approval), V4 (submitting from a template), V6 (an evidence gate on every forward move), and V7 (an admin approval before Investment). All three AI calls have been run against the live Anthropic API. It is a prototype: it runs on one machine, has no user accounts, and stores ideas in a local file.
 
 ## Run it locally
 
@@ -147,15 +147,18 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 
 ## Intent files
 
+The app was built from the intent files in [templates/intents/](templates/intents/). Start with the [index](templates/intents/README.md), which lists each intent, what later intents changed, and the app's current rules.
+
 | File | What it covers |
 | --- | --- |
-| [intentv1.md](templates/intents/intentv1.md) | The original V1 intent; the source of truth for product meaning |
-| [INTENT.md](templates/intents/INTENT.md) | Implementation-ready V1, with its as-built decisions and the evaluation prompt |
+| [intentv1.md](templates/intents/intentv1.md) | The original intent and the product principle |
+| [INTENT.md](templates/intents/INTENT.md) | V1 made implementation-ready, with the evaluation prompt |
 | [intentv2.md](templates/intents/intentv2.md) | V2: stored ideas and the four remaining views |
 | [intentv3.md](templates/intents/intentv3.md) | V3: an AI analysis for approved ideas; its contract and prompt are superseded by V5 |
-| [intentv4.md](templates/intents/intentv4.md) | V4: submitting from a template, with its as-built decisions |
-| [intentv5.md](templates/intents/intentv5.md) | V5: the evidence-led analysis, with its as-built decisions and the analysis prompt |
-| [intentv6.md](templates/intents/intentv6.md) | V6: the evidence gate on forward moves, with its as-built decisions and the gate prompt |
-| [intentv7.md](templates/intents/intentv7.md) | V7: the admin approval before Investment, with its as-built decisions |
+| [intentv4.md](templates/intents/intentv4.md) | V4: submitting from a template |
+| [intentv5.md](templates/intents/intentv5.md) | V5: the evidence-led analysis, with the analysis prompt |
+| [intentv6.md](templates/intents/intentv6.md) | V6: the evidence gate on forward moves, with the gate prompt |
+| [intentv7.md](templates/intents/intentv7.md) | V7: the admin approval before Investment |
+| [exhappypath.md](templates/intents/exhappypath.md) | A worked example of an idea earning its way to investment; an illustration, not an intent |
 
-The implemented intents, with their As Built sections, are meant to be enough to rebuild the app: INTENT.md, then intentv2.md to intentv7.md.
+Each implemented intent ends with an As Built section. Together they are meant to be enough to rebuild the app.

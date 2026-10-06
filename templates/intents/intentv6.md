@@ -1,8 +1,15 @@
 # AI Suggestion Box — V6 Intent
 
-Builds on [intentv1.md](intentv1.md), [INTENT.md](INTENT.md), [intentv2.md](intentv2.md), [intentv3.md](intentv3.md), and [intentv5.md](intentv5.md). Everything in those stays as built unless this file says otherwise. It does not depend on [intentv4.md](intentv4.md), which is not yet implemented.
+**Builds on:** [INTENT.md](INTENT.md) (V1), [intentv2.md](intentv2.md), [intentv3.md](intentv3.md), and [intentv5.md](intentv5.md).
 
-Status: implemented. The **As Built** section at the end records the decisions the implementation made. [intentv7.md](intentv7.md) later added a required admin approval in front of Investment, which is checked before this gate and has no override.
+**Status:** Implemented.
+
+**Later changes:** the sections below describe V6 as it was specified and built. Later intents changed these parts:
+
+- [intentv4.md](intentv4.md), built afterwards, pre-fills the move note from a template. The note is checked like any other.
+- [intentv7.md](intentv7.md) adds a required admin approval in front of Investment. It is checked before the evidence gate and has no override, so "the gate never blocks a human outright" now describes the evidence gate only.
+
+See [README.md](README.md) in this folder for how the intents fit together.
 
 ## 1. Intent / Goal
 
@@ -18,7 +25,7 @@ The reviewer still decides. The gate informs the decision and records it; it nev
 
 In the author's own test, an idea went from Problem to Investment on the notes "100 hoyrs used last week", "too much hassle always late managen]ment confused", "show example", and "approved". The V5 analysis can tell measured evidence from loose claims, but it runs once, after the fact, and affects nothing.
 
-### Current state
+### State when this intent was written
 
 - A reviewer moves an idea one stage at a time from "Move this idea" in Review Pipeline. A note of 1 to 500 characters is required. The move is saved immediately.
 - Each move is recorded in the idea's history as `from`, `to`, `note`, and `at`.

@@ -1,8 +1,17 @@
 # AI Suggestion Box — V1 Implementation Intent
 
-Source: [intentv1.md](intentv1.md). This file restates that intent in implementation-ready form. Where the two differ, intentv1.md wins on product meaning.
+**Builds on:** [intentv1.md](intentv1.md), the author's original. This file restates it in implementation-ready form.
 
-Status: implemented. The **As Built** section at the end records every decision the implementation made, so the app can be rebuilt from this file together with [intentv2.md](intentv2.md) and [intentv3.md](intentv3.md).
+**Status:** Implemented.
+
+**Later changes:** the sections below describe V1 as it was specified and built. Later intents changed these parts:
+
+- [intentv2.md](intentv2.md) stores ideas, makes the other four navigation items work, and replaces `POST /api/evaluate` with `POST /api/ideas`. The "no persistence" constraint and the "only Submit Idea is functional" rule end there.
+- [intentv3.md](intentv3.md) and [intentv6.md](intentv6.md) add the second and third AI calls, so "one model call" no longer holds.
+- [intentv4.md](intentv4.md) adds the template actions under the submit button, serves the two template files, and adds one paragraph to the evaluation prompt. The appendix here holds the current prompt.
+- [intentv7.md](intentv7.md) adds admin sign-in to the sidebar, which ends "no authentication", and makes the sidebar stay in view while the page scrolls.
+
+See [README.md](README.md) in this folder for how the intents fit together.
 
 ## 1. Intent / Goal
 

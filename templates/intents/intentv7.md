@@ -1,10 +1,12 @@
 # AI Suggestion Box — V7 Intent
 
-Builds on [intentv1.md](intentv1.md), [INTENT.md](INTENT.md), and [intentv2.md](intentv2.md) to [intentv6.md](intentv6.md). Everything in those stays as built unless this file says otherwise.
+**Builds on:** [INTENT.md](INTENT.md) (V1) and [intentv2.md](intentv2.md) to [intentv6.md](intentv6.md).
 
-This is a prototype of the approval step. It is meant to show the rule working, not to be real access control.
+**Status:** Implemented. This is a prototype of the approval step: it shows the rule working and is not real access control.
 
-Status: implemented. The **As Built** section at the end records the decisions the implementation made.
+**Later changes:** none. This is the last intent of the prototype.
+
+See [README.md](README.md) in this folder for how the intents fit together.
 
 ## 1. Intent / Goal
 
@@ -14,7 +16,7 @@ Investment is where money is committed. The evidence gate checks whether the evi
 
 ## 2. Inputs / Context
 
-### Current state
+### State when this intent was written
 
 - An idea moves one stage at a time. Every forward move is checked by the evidence gate, and a reviewer can move anyway with a reason.
 - There is no sign-in. Anyone using the workbench can move any idea. An idea's submitter is known only as the browser it was submitted from.

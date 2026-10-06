@@ -1,8 +1,15 @@
 # AI Suggestion Box — V4 Intent
 
-Builds on [intentv1.md](intentv1.md), [INTENT.md](INTENT.md), [intentv2.md](intentv2.md), and [intentv3.md](intentv3.md). Everything in V1 to V3 stays as built unless this file says otherwise.
+**Builds on:** [INTENT.md](INTENT.md) (V1), [intentv2.md](intentv2.md), and [intentv3.md](intentv3.md).
 
-Status: implemented, after V5 and V6. The **As Built** section at the end records the decisions the implementation made, including how it works with the V6 evidence gate.
+**Status:** Implemented. It was written fourth but built after V5 and V6, so its As Built section describes how it works with the evidence gate.
+
+**Later changes:** the sections below describe V4 as it was specified and built. Later intents changed these parts:
+
+- [intentv6.md](intentv6.md) was already in place when V4 was built: every pre-filled note still goes through the evidence check. Where this file says the workbench makes "only the evaluation and the analysis", there are now three AI calls; V4 itself added none.
+- [intentv7.md](intentv7.md) requires an admin's approval before Investment. Taking the filled example "from Problem to Investment without typing" now also needs that approval before the last move.
+
+See [README.md](README.md) in this folder for how the intents fit together.
 
 ## 1. Intent / Goal
 
@@ -14,7 +21,7 @@ The product principle holds. The template asks about the problem and what has be
 
 ## 2. Inputs / Context
 
-### Current state
+### State when this intent was written
 
 - V1 to V3 are implemented and merged into `main`.
 - A submission is free text of 1 to 4,000 characters, evaluated once and stored.
@@ -114,7 +121,7 @@ A person can also submit plain free text and see no difference from V3.
 
 ## Constraints
 
-- Recognition is deterministic. No additional AI call is added; the workbench still makes only the evaluation and the analysis.
+- Recognition is deterministic. V4 adds no AI call.
 - AI does not move ideas between stages, write stage notes, or record outcomes.
 - The template is plain text that can be written in any editor and pasted. No file upload, no multi-field form, and no document formats.
 - One template. No template editor, no per-department templates, no versions.

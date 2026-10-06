@@ -6,7 +6,7 @@ Templates for submitting an idea to the Ideas Workbench without typing everythin
 | --- | --- |
 | [idea-template.txt](idea-template.txt) | The blank template. Replace each `[bracketed prompt]` with your own words and delete any section you can't fill in yet. |
 | [example-idea.txt](example-idea.txt) | A filled-in example, ready to paste into **Submit Idea** to see what happens. It is an illustration, not a real idea. |
-| [intents/](intents/) | The intent files the app was built from, V1 to V5. |
+| [intents/](intents/) | The intent files the app was built from, V1 to V7. Start with [intents/README.md](intents/README.md). |
 
 ## How to use one
 

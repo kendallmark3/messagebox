@@ -1,8 +1,19 @@
 # AI Suggestion Box — V2 Intent
 
-Builds on [intentv1.md](intentv1.md) and [INTENT.md](INTENT.md). Everything in V1 stays as built unless this file says otherwise.
+**Builds on:** [INTENT.md](INTENT.md) (V1).
 
-Status: implemented. The **As Built** section at the end records the decisions the implementation made. [intentv6.md](intentv6.md) later added an evidence check to forward stage moves, which changes the `POST /api/ideas/:id/stage` request and response and adds fields to each history entry. [intentv7.md](intentv7.md) added an `approval` field to ideas and a single admin role.
+**Status:** Implemented.
+
+**Later changes:** the sections below describe V2 as it was specified and built. Later intents changed these parts:
+
+- [intentv3.md](intentv3.md) and [intentv6.md](intentv6.md) add the second and third AI calls, so "the only AI call remains the V1 evaluation" no longer holds.
+- [intentv3.md](intentv3.md) and [intentv5.md](intentv5.md) add an `analysis` field to each idea, an Analysis section on the idea's page, and an "Analysis" pill on the board.
+- [intentv4.md](intentv4.md) adds a `template` field, lists a templated idea by its title, and pre-fills the move note and the outcome form.
+- [intentv6.md](intentv6.md) changes `POST /api/ideas/:id/stage`: forward moves are checked against an evidence bar, the response becomes `{ idea, moved, gate, checkError }`, and history entries gain `gate` and `override`. "Move this idea" gains the bar, the check result, and "move anyway".
+- [intentv7.md](intentv7.md) adds an `approval` field, an Investment approval section, and one admin role. "No authentication, accounts, or roles" becomes "one shared admin passcode, for approval only".
+- The idea's page now reads, top to bottom: back link, Suggestion, Idea Pipeline, Investment approval, Move this idea, Evaluation, Analysis, Outcome, Stage history.
+
+See [README.md](README.md) in this folder for how the intents fit together.
 
 ## 1. Intent / Goal
 

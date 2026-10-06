@@ -46,19 +46,21 @@ The AI Suggestion Box ("Ideas Workbench"): a desktop-first web app where an empl
 
 ## Which document governs
 
-The intent files live in `templates/intents/`. The author moved them there from the repository root; keep them there.
+The intent files live in `templates/intents/`. The author moved them there from the repository root; keep them there. `templates/intents/README.md` is the index: it lists every intent, what later intent changed it, and the app's current rules with the intent that owns each one. Start there.
 
-- `intentv1.md` is the author's original intent and wins on product meaning. Do not edit it unless asked.
-- `INTENT.md` (V1) and `intentv2.md` to `intentv7.md` are all implemented. Each ends with **As Built** (and **Decisions Made** for V2 and V3), which record the concrete choices in the code: stack, API, limits, messages, screen layout, and wording. Together they are meant to be enough to rebuild the app.
-- `intentv5.md` replaces V3's analysis contract, prompt, and screen section with the evidence-led version: recommendation first, evidence sorted into known, reported but unverified, and inferred, a fixed investment trigger, and the architecture shown only as conditional. `intentv3.md` still governs when the analysis runs, its storage, and its failure handling.
-- `intentv6.md` adds the evidence gate: every forward stage move is checked against a fixed bar for that stage, and is saved only on a pass or with a recorded override reason. It changes the stage endpoint and the history entries defined in `intentv2.md`.
-- `intentv4.md` adds submitting from a template. It was implemented after V5 and V6. `templates/idea-template.txt` and `templates/example-idea.txt` are the template itself: the server serves those two files to the Submit screen, so editing them changes what the app offers.
-- `intentv7.md` adds a prototype approval gate: an idea needs an admin's approval to move from Pilot to Investment, and the approver cannot be the submitter. It relaxes the earlier "no authentication, roles, or approvals" rule to exactly one role and one approval.
-- `README.md` is the reader-facing summary of the current app.
+- `intentv1.md` is the author's original intent and the source of the product principle. Leave its body as written.
+- `INTENT.md` (V1) and `intentv2.md` to `intentv7.md` are all implemented, and the prototype is complete at V7. V4 was written fourth but built after V5 and V6.
+- Where two intents disagree, the later one wins. Later intents deliberately relaxed earlier constraints: persistence and working navigation (V2), more AI calls (V3, V6), and one admin role with one approval (V7).
+- Every intent opens with the same block: **Builds on**, **Status**, and **Later changes**. The body below it describes that version as specified and built at the time, and ends with **As Built** (plus **Decisions Made** in V2, V3, and V4).
+- `intentv5.md` replaces V3's analysis contract, prompt, and screen section. `intentv3.md` still governs when the analysis runs, its storage, and its failure handling.
+- `exhappypath.md` is the author's worked example of an idea earning its way to investment. It is an illustration, not an intent, and it differs from the app (it has a sixth step, a shadow trial). Do not treat it as a specification.
+- `templates/idea-template.txt` and `templates/example-idea.txt` are the idea template itself: the server serves those two files to the Submit screen, so editing them changes what the app offers.
+- `README.md` at the repository root is the reader-facing summary of the current app.
 
 Keeping these in line is part of any change:
 
 - A change to behaviour, an API route, a limit, a user-facing message, or screen wording must be reflected in the As Built section of the intent that owns it.
+- A change that alters something an earlier intent describes must also be added to that intent's **Later changes** list and to the tables in `templates/intents/README.md`.
 - The three system prompts in `server.js` are reproduced verbatim in the appendices of `INTENT.md` (evaluation), `intentv5.md` (analysis), and `intentv6.md` (gate). Change them together. The appendix in `intentv3.md` is the superseded V3 prompt and is left as it is.
 - New scope gets a new intent file rather than rewriting an old one.
 
