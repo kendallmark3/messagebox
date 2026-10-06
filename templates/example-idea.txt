@@ -1,0 +1,26 @@
+Title:
+Simplify our weekly status reporting
+
+Problem:
+Every week, people across the company build a status report by hand. We pull numbers from Excel spreadsheets, emails and project systems, then format them into PowerPoint slides. Everyone does it a little differently, so the reports are inconsistent, and a lot of time goes into copying, pasting, formatting and correcting slides.
+
+Who it affects:
+About 100 employees who prepare a weekly status report, and the leadership team who read them.
+
+Evidence:
+We asked 12 people in three departments to time their report for two weeks. The average was 1 hour 10 minutes per person per week, and about 40 minutes of that was formatting slides, not gathering information. Leadership sent back 9 of the 24 reports for layout or missing-section fixes.
+
+Why it is worth prototyping:
+Most of the time goes into formatting, which is the same work repeated by 100 people. The operations director and two department heads agreed it is worth trying one shared format before changing anything else.
+
+Prototype:
+One department (8 people) used a single approved slide layout with a one-page input sheet for three weeks. Average preparation time fell from 70 minutes to 30 minutes, and none of their reports were sent back.
+
+Pilot:
+Three departments (31 people) used the shared layout and input sheet for six weeks. Preparation time averaged 32 minutes per person per week. Two teams asked for an extra section for risks, which was added in week three.
+
+Outcome:
+The shared layout and input sheet are now the standard for the three pilot departments, and leadership has asked for the remaining departments to move over next quarter.
+
+Hours saved per week:
+20

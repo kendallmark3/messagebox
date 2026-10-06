@@ -20,12 +20,13 @@ Two pieces, with no framework and no build step:
   - The analysis runs in the background after the move has been saved, so its failure cannot affect the move. In-progress and failed runs are tracked in memory only (`analysisRuns`); every idea returned by the API carries a computed `analysisStatus` of `none`, `running`, `failed`, or `ready`. Only a complete result is written to `idea.analysis`, replacing the previous one.
   - Ideas are held in memory and written to `data/ideas.json` (git-ignored) after every change. There is no database.
   - The server owns the rules: stages move one step at a time, a move needs a note, and an outcome is only accepted at Pilot or Investment. Every failure maps to a short user-safe message; details go to the server log only.
-- `public/` is static HTML, CSS, and one script. The Submit view is static markup; the other four views and the idea detail are built in `app.js` and selected by a hash route (`#/my-ideas`, `#/pipeline/<id>`, and so on). Analytics and Impact figures are computed in the browser from the ideas list, so they always match what is stored. On the idea detail, the Potential architecture section redraws itself and polls while a run is in progress, so a note being typed elsewhere on the page is not lost.
+- `public/` is static HTML, CSS, and one script. The Submit view is static markup; the other four views and the idea detail are built in `app.js` and selected by a hash route (`#/my-ideas`, `#/pipeline/<id>`, and so on). Analytics and Impact figures are computed in the browser from the ideas list, so they always match what is stored. On the idea detail, the Analysis section redraws itself and polls while a run is in progress, so a note being typed elsewhere on the page is not lost.
 
 Things that must change together:
 
 - The zod `Evaluation` schema in `server.js` is the evaluation contract; `FIELDS` and `BADGE_CLASS` in `public/app.js` mirror it.
-- The zod `Analysis` schema in `server.js` is the analysis contract; `architectureCard` in `public/app.js` renders its fields.
+- The zod `Analysis` schema in `server.js` is the analysis contract; `analysisCard` in `public/app.js` renders its fields. `legacyArchitectureCard` renders analyses stored in the V3 shape, which have no `recommendation` field.
+- The fixed investment trigger sentence is `INVESTMENT_TRIGGER` in `public/app.js`. It is supplied by the page, not by the model.
 - The stage that triggers the analysis is `ANALYSIS_STAGE` in `server.js` and `ANALYSIS_STAGE_INDEX` in `public/app.js`.
 - The stage list exists in both `server.js` (`STAGES`) and `public/app.js` (`STAGES`), and stage colours are keyed by stage name in `public/styles.css`.
 
@@ -33,18 +34,22 @@ Things that must change together:
 
 ## What is being built
 
-The AI Suggestion Box ("Ideas Workbench"): a desktop-first web app where an employee types one free-text workplace problem or idea and gets back a structured AI evaluation from one Anthropic API call. Since V2, each evaluated idea is stored and can be moved through Problem → Evidence → Prototype → Pilot → Investment. Since V3, approving an idea into Prototype produces an AI-proposed potential architecture. It is an evaluation workbench, not a chat and not a portal.
+The AI Suggestion Box ("Ideas Workbench"): a desktop-first web app where an employee types one free-text workplace problem or idea and gets back a structured AI evaluation from one Anthropic API call. Since V2, each evaluated idea is stored and can be moved through Problem → Evidence → Prototype → Pilot → Investment. Approving an idea into Prototype produces an evidence-led AI analysis: what to do next, what the evidence does and does not support, and only conditionally what could be built. It is an evaluation workbench, not a chat and not a portal.
 
 ## Which document governs
 
+The intent files live in `templates/intents/`. The author moved them there from the repository root; keep them there.
+
 - `intentv1.md` is the author's original intent and wins on product meaning. Do not edit it unless asked.
-- `INTENT.md` (V1), `intentv2.md`, and `intentv3.md` are the implementation-ready intents. Each ends with **Decisions Made** (V2, V3) and **As Built**, which record the concrete choices in the code: stack, API, limits, messages, screen layout, and wording. Together they are meant to be enough to rebuild the app.
+- `INTENT.md` (V1), `intentv2.md`, `intentv3.md`, and `intentv5.md` are the implemented intents. Each ends with **As Built** (and **Decisions Made** for V2 and V3), which record the concrete choices in the code: stack, API, limits, messages, screen layout, and wording. Together they are meant to be enough to rebuild the app.
+- `intentv5.md` replaces V3's analysis contract, prompt, and screen section with the evidence-led version: recommendation first, evidence sorted into known, reported but unverified, and inferred, a fixed investment trigger, and the architecture shown only as conditional. `intentv3.md` still governs when the analysis runs, its storage, and its failure handling.
+- `intentv4.md` (submitting from a template) is written but not implemented. `templates/idea-template.txt` and `templates/example-idea.txt` exist; the app does not recognise them yet.
 - `README.md` is the reader-facing summary of the current app.
 
 Keeping these in line is part of any change:
 
 - A change to behaviour, an API route, a limit, a user-facing message, or screen wording must be reflected in the As Built section of the intent that owns it.
-- The two system prompts in `server.js` are reproduced verbatim in the appendices of `INTENT.md` (evaluation) and `intentv3.md` (analysis). Change them together.
+- The two system prompts in `server.js` are reproduced verbatim in the appendices of `INTENT.md` (evaluation) and `intentv5.md` (analysis). Change them together. The appendix in `intentv3.md` is the superseded V3 prompt and is left as it is.
 - New scope gets a new intent file rather than rewriting an old one.
 
 ## Decisions already made in the intents
@@ -54,7 +59,9 @@ Keeping these in line is part of any change:
 - The Anthropic API key is read from an environment variable and used server-side only.
 - There are exactly two AI calls: the evaluation at submission and the analysis on approval. Opening an idea never calls the AI. AI does not move ideas between stages or produce analytics or impact figures.
 - The move from Evidence to Prototype is the approval. There is no separate approve action or approver role.
-- The analysis is given only what is stored on the idea, must not invent systems, costs, or timelines, must name a simpler alternative, and is labelled as an AI-generated suggestion wherever shown.
+- The analysis is given only what is stored on the idea, must not invent systems, costs, or timelines, and is labelled as an AI-generated suggestion wherever shown.
+- The analysis recommends before it designs. Only evidence it classes as known may carry the recommendation or the conditional architecture; unclear reviewer notes are quoted under reported but unverified. Do not architect the imagined solution; architect the smallest next move the evidence justifies.
+- The recommendation is advice. It does not block or automate stage moves.
 - Impact numbers are reviewer-entered estimates and are labelled as such.
 - Views start empty; there are no seeded or invented ideas. The Top Ideas panel is a static example list.
 - No authentication, roles, approvals, notifications, chat, workflow engine, multi-agent orchestration, database server, or Jira integration.
@@ -64,8 +71,8 @@ Each intent's stop condition is deliberate: once its acceptance criteria are evi
 ## Known gaps and deliberate differences
 
 - `concept.png` is the concept image `intentv1.md` refers to. The screen follows it in spirit but deliberately omits its search box, vote counts, and per-stage counts: none are in the intent, and they would be non-functional or invented data.
-- Live-API validation covers the four example sentences from `intentv1.md`: evaluation through `POST /api/ideas` (about 5 to 13 seconds each) and, with realistic reviewer notes, the analysis on approval (about 16 to 18 seconds each). The browser flows, failure states, and stage and outcome rules were checked against a stand-in API only.
-- Live output runs long: evaluations exceed the "one to three short sentences" asked for, and each analysis is around 600 words.
+- Live-API validation covers the four example sentences from `intentv1.md`: evaluation through `POST /api/ideas` (about 5 to 13 seconds each) and, with realistic reviewer notes, the analysis on approval (about 14 to 18 seconds each), plus the analysis on a copy of the author's status-reporting test idea. The browser flows, failure states, and stage and outcome rules were checked against a stand-in API only.
+- Live output runs long: evaluations exceed the "one to three short sentences" asked for, and analyses average about 414 words against a target of about 300 to 400.
 - Neither model call opts into the API's server-side refusal `fallbacks`; a refusal is shown to the user as a plain "couldn't be evaluated" or "couldn't be produced" message.
 
 ## intent-driven-starter/

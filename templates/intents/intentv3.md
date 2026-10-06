@@ -2,7 +2,7 @@
 
 Builds on [intentv1.md](intentv1.md), [INTENT.md](INTENT.md), and [intentv2.md](intentv2.md). Everything in V1 and V2 stays as built unless this file says otherwise.
 
-Status: implemented. The **As Built** section at the end records the decisions the implementation made.
+Status: implemented, then partly superseded. [intentv5.md](intentv5.md) replaces the analysis contract, the prompt, the screen section, and the analysis messages described here. When the analysis runs, who can see it, how it is stored, and how failures are handled are still as this file describes.
 
 ## 1. Intent / Goal
 
@@ -16,7 +16,7 @@ The product principle holds. Employees still submit problems and opportunities, 
 
 ### State when this intent was written
 
-- V2 was implemented: [server.js](server.js) stored ideas in `data/ideas.json` and exposed the ideas API, with stage moves going one step at a time and needing a note. [public/app.js](public/app.js) built the views and the idea detail.
+- V2 was implemented: [server.js](../../server.js) stored ideas in `data/ideas.json` and exposed the ideas API, with stage moves going one step at a time and needing a note. [public/app.js](../../public/app.js) built the views and the idea detail.
 - The only AI call was the evaluation at submission. Its six-field result was stored on the idea and never regenerated.
 - There was no concept of approval. Anyone could move an idea, and the move with its note was the only record of why.
 
@@ -190,7 +190,9 @@ Each was built with the default below; none was changed by the author.
 - Against the stand-in API, in headless Chrome with a separate idea store: the trigger on approval, the waiting state, a failed result, a malformed result, run-again, refusals below Prototype and during a run, moving back, refresh, and restart. The V1 and V2 checks were repeated on the V3 code.
 - Against the live API: the four example ideas from intentv1.md were taken to Prototype with realistic reviewer notes. Each analysis arrived in 16 to 18 seconds, used the reviewer notes, named a simpler alternative, listed assumptions, and did not propose AI. Each ran to about 600 words.
 
-## Appendix: Analysis System Prompt
+## Appendix: Analysis System Prompt (V3, superseded)
+
+This is the prompt V3 shipped with, kept for the record. The prompt now in `server.js` is the one in [intentv5.md](intentv5.md).
 
 ```text
 You propose a potential architectural pattern for an employee idea that has been approved to move into prototyping.

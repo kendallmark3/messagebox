@@ -1,8 +1,8 @@
 # AI Suggestion Box
 
-An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work. AI returns a short structured evaluation, the idea is kept and moved through a pipeline as it earns it, and once it is approved for prototyping the workbench proposes a potential architecture for it.
+An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work. AI returns a short structured evaluation, the idea is kept and moved through a pipeline as it earns it, and once it is approved for prototyping the workbench says what the evidence justifies doing next.
 
-> **Status:** release candidate (git tag `candidate`). All three versions are implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), and V3 (potential architecture on approval). Both AI calls have been run against the live Anthropic API with the four example sentences below.
+> **Status:** release candidate (git tag `candidate`). Implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 (analysis on approval), and V5 (the evidence-led form of that analysis). V4 (submitting from a template) is written as an intent but not yet built. Both AI calls have been run against the live Anthropic API with the four example sentences below.
 
 ## Run it locally
 
@@ -64,13 +64,18 @@ The ideas submitted from this browser, newest first. Each opens to its evaluatio
 
 All ideas grouped by stage. Anyone can open an idea and move it one stage forward or back; a short note is required and is kept in the idea's history. For an idea at Pilot or Investment, the reviewer can also record an outcome.
 
-### Potential architecture
+### Analysis on approval
 
-Moving an idea from Evidence to Prototype is the approval. It starts a second AI analysis that proposes a solution shape: the pattern, why it fits, its main parts, the data and systems it would touch, a simpler alternative, assumptions, risks, and the smallest first prototype.
+Moving an idea from Evidence to Prototype is the approval. It starts a second AI call that says what the evidence justifies doing next:
 
-- It works only from what is stored on the idea: the suggestion, the evaluation, the reviewer notes, and any outcome.
-- It is labelled as an AI-generated suggestion wherever it is shown. It is a starting point, not a design.
-- A failed analysis never blocks or undoes the move. A reviewer can run it again from Review Pipeline, and the new result replaces the old one.
+- **A recommendation:** Do not build yet, Change the process first, or Build the smallest next step, with the smallest next move and the reason.
+- **The investment trigger:** build only if evidence shows the next increment will produce enough measurable value to justify its cost and operational burden, plus what that would mean for this idea.
+- **What the evidence says,** sorted into known, reported but unverified, and inferred, so loose notes do not turn into facts.
+- **If automation is justified…:** a small, conditional sketch of what could be built.
+
+It works only from what is stored on the idea, and it is labelled as an AI-generated suggestion wherever it is shown. A failed analysis never blocks or undoes the move, and a reviewer can run it again from Review Pipeline.
+
+> Don't architect the imagined solution. Architect the smallest next move the evidence justifies.
 
 ### Analytics
 
@@ -103,12 +108,21 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 | --- | --- |
 | [server.js](server.js) | Serves the page, stores ideas, and makes the two Anthropic API calls: evaluation on submission and analysis on approval |
 | [public/](public/) | The workbench screens: HTML, CSS, and browser script |
-| [intentv1.md](intentv1.md) | The original V1 intent; the source of truth for product meaning |
-| [INTENT.md](INTENT.md) | Implementation-ready V1 intent, with its as-built decisions and the evaluation prompt |
-| [intentv2.md](intentv2.md) | The V2 intent: stored ideas and the four remaining views, with its as-built decisions |
-| [intentv3.md](intentv3.md) | The V3 intent: a potential architecture for approved ideas, with its as-built decisions and the analysis prompt |
+| [templates/intents/](templates/intents/) | The intent files the app was built from (see below) |
+| [templates/](templates/) | A blank idea template and a filled-in example to paste into Submit Idea |
 | [concept.png](concept.png) | The concept image the screens follow |
 | [CLAUDE.md](CLAUDE.md) | Guidance for Claude Code when working in this repository |
 | [intent-driven-starter/](intent-driven-starter/) | Copy of the Intent-Driven Starter plugin (skills, agents, hooks) used to build from the intents |
 
-The three intent files with their As Built sections are meant to be enough to rebuild the app: [INTENT.md](INTENT.md), then [intentv2.md](intentv2.md), then [intentv3.md](intentv3.md).
+## Intent files
+
+| File | What it covers |
+| --- | --- |
+| [intentv1.md](templates/intents/intentv1.md) | The original V1 intent; the source of truth for product meaning |
+| [INTENT.md](templates/intents/INTENT.md) | Implementation-ready V1, with its as-built decisions and the evaluation prompt |
+| [intentv2.md](templates/intents/intentv2.md) | V2: stored ideas and the four remaining views |
+| [intentv3.md](templates/intents/intentv3.md) | V3: an AI analysis for approved ideas; its contract and prompt are superseded by V5 |
+| [intentv4.md](templates/intents/intentv4.md) | V4: submitting from a template. Not yet built |
+| [intentv5.md](templates/intents/intentv5.md) | V5: the evidence-led analysis, with its as-built decisions and the analysis prompt |
+
+The implemented intents, with their As Built sections, are meant to be enough to rebuild the app: INTENT.md, then intentv2.md, intentv3.md, and intentv5.md.

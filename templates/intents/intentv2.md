@@ -16,7 +16,7 @@ The product principle is unchanged: employees submit problems and opportunities,
 
 ### State when this intent was written
 
-- V1 was implemented: [server.js](server.js) (a plain `node:http` server with `POST /api/evaluate`) and [public/](public/) (one static page, no framework, no build step).
+- V1 was implemented: [server.js](../../server.js) (a plain `node:http` server with `POST /api/evaluate`) and [public/](../../public/) (one static page, no framework, no build step).
 - Nothing was stored. An evaluation was lost on refresh.
 - There were no user accounts.
 - The four navigation items were rendered but inert.
@@ -98,7 +98,7 @@ With no ideas, shows an empty state rather than zeros dressed up as charts.
 ### Unchanged
 
 - The Top Ideas panel stays a static example list.
-- The visual direction: follow [concept.png](concept.png) in spirit, and keep the new views consistent with the V1 screen.
+- The visual direction: follow [concept.png](../../concept.png) in spirit, and keep the new views consistent with the V1 screen.
 
 ## 4. Success Criteria
 
