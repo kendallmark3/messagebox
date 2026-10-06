@@ -2,7 +2,7 @@
 
 Builds on [intentv1.md](intentv1.md), [INTENT.md](INTENT.md), [intentv2.md](intentv2.md), [intentv3.md](intentv3.md), and [intentv5.md](intentv5.md). Everything in those stays as built unless this file says otherwise. It does not depend on [intentv4.md](intentv4.md), which is not yet implemented.
 
-Status: implemented. The **As Built** section at the end records the decisions the implementation made.
+Status: implemented. The **As Built** section at the end records the decisions the implementation made. [intentv7.md](intentv7.md) later added a required admin approval in front of Investment, which is checked before this gate and has no override.
 
 ## 1. Intent / Goal
 
