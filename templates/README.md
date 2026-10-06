@@ -26,6 +26,8 @@ Only **Problem** is needed to submit. Each later section matches a stage in the 
 
 ## What the workbench does with it
 
-Today the whole text is evaluated as one suggestion, and stage notes are still typed by hand. [intentv4.md](intents/intentv4.md) describes the change that makes the workbench recognise the sections and reuse them at each stage.
+The workbench recognises the sections when you submit. It lists the idea by its title, shows which stages already have their information, and fills in the note for each stage move and the outcome form from the matching section, so a reviewer only has to confirm. The details are in [intentv4.md](intents/intentv4.md).
+
+On the Submit Idea screen, "Use the template" and "see a filled-in example" put these same files in the box for you.
 
 Keep the section names and the colon exactly as written, each on its own line, so the workbench can find them. A submission can be at most 4,000 characters.

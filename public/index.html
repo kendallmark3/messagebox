@@ -60,6 +60,18 @@
               <span class="hint">Describe it the way you'd tell a colleague. You don't need a solution.</span>
               <button type="submit" class="btn btn-primary" id="submit-btn" disabled>Submit Idea</button>
             </div>
+            <p class="template-row hint" id="template-row">
+              Already have evidence or results?
+              <button type="button" class="link-button" data-template="idea-template.txt">Use the template</button>
+              or
+              <button type="button" class="link-button" data-template="example-idea.txt">see a filled-in example</button>.
+              <span id="template-ask" hidden>
+                <strong>Replace what you've typed?</strong>
+                <button type="button" class="link-button" id="template-yes">Yes, replace</button>
+                <button type="button" class="link-button" id="template-no">Cancel</button>
+              </span>
+              <span class="form-message is-error" id="template-error" role="status"></span>
+            </p>
           </form>
         </section>
 

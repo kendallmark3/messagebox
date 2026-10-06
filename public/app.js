@@ -176,8 +176,14 @@ function statTile(value, label, note) {
   );
 }
 
+// A templated idea is listed by its title; a free-text one by its opening words.
+function ideaName(idea) {
+  return idea.title || idea.suggestion;
+}
+
 function ideaRow(idea, href, extra) {
-  const text = idea.suggestion.length > 140 ? `${idea.suggestion.slice(0, 140).trimEnd()}…` : idea.suggestion;
+  const name = ideaName(idea);
+  const text = name.length > 140 ? `${name.slice(0, 140).trimEnd()}…` : name;
   return h(
     "a",
     { class: "idea-row", href },
@@ -242,6 +248,9 @@ async function submitIdea() {
 function resetSubmit() {
   if (pending) return;
   form.reset();
+  input.style.height = "";
+  templateAsk.hidden = true;
+  templateError.textContent = "";
   errorBox.hidden = true;
   evaluationBox.replaceChildren();
   showSubmitPipeline("New ideas start here");
@@ -249,6 +258,39 @@ function resetSubmit() {
   window.scrollTo({ top: 0 });
   input.focus({ preventScroll: true });
 }
+
+// Puts the blank template or the filled example in the box, asking first if there is text to lose.
+const templateAsk = document.getElementById("template-ask");
+const templateError = document.getElementById("template-error");
+let pendingTemplate = null;
+
+async function useTemplate(file) {
+  templateAsk.hidden = true;
+  templateError.textContent = "";
+  try {
+    const response = await fetch(`/templates/${file}`);
+    if (!response.ok) throw new Error();
+    input.value = (await response.text()).trim();
+    input.style.height = "340px";
+    syncSubmit();
+    input.focus();
+    input.setSelectionRange(0, 0);
+    input.scrollTop = 0;
+  } catch {
+    templateError.textContent = "The template couldn't be loaded.";
+  }
+}
+
+for (const button of document.querySelectorAll("[data-template]")) {
+  button.addEventListener("click", () => {
+    if (pending) return;
+    if (input.value.trim() === "") return useTemplate(button.dataset.template);
+    pendingTemplate = button.dataset.template;
+    templateAsk.hidden = false;
+  });
+}
+document.getElementById("template-yes").addEventListener("click", () => useTemplate(pendingTemplate));
+document.getElementById("template-no").addEventListener("click", () => (templateAsk.hidden = true));
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -338,7 +380,7 @@ async function renderPipeline() {
               h(
                 "a",
                 { class: "board-card", href: `#/pipeline/${idea.id}` },
-                h("span", { class: "board-card-text" }, idea.suggestion.length > 90 ? `${idea.suggestion.slice(0, 90).trimEnd()}…` : idea.suggestion),
+                h("span", { class: "board-card-text" }, ideaName(idea).length > 90 ? `${ideaName(idea).slice(0, 90).trimEnd()}…` : ideaName(idea)),
                 h(
                   "span",
                   { class: "board-card-tags" },
@@ -368,8 +410,10 @@ async function renderDetail(view, id) {
       "section",
       { class: "card" },
       h("div", { class: "evaluation-head" }, h("h2", { class: "card-title" }, "Suggestion"), stageTag(idea.stage)),
+      idea.title && h("p", { class: "idea-title" }, idea.title),
       h("p", { class: "suggestion-text" }, idea.suggestion),
       h("p", { class: "hint" }, `Submitted ${formatDate(idea.submittedAt)}`),
+      idea.supplied && suppliedRow(idea.supplied),
       view === "my-ideas" && idea.submitterId === getSubmitterId() && h("div", { class: "form-row" }, h("span"), deleteControl(idea))
     ),
     pipelineCard(idea.stage, "This idea is here"),
@@ -378,6 +422,20 @@ async function renderDetail(view, id) {
     architectureSection(view, idea),
     canRecordOutcome ? outcomeForm(idea) : idea.outcome && outcomeSummary(idea.outcome),
     historyCard(idea)
+  );
+}
+
+// For a templated idea: which stage moves already have their information.
+function suppliedRow(supplied) {
+  return h(
+    "div",
+    { class: "supplied" },
+    h("span", { class: "gate-label" }, "Supplied in the template"),
+    h(
+      "span",
+      { class: "supplied-tags" },
+      supplied.map(({ stage, supplied: has }) => h("span", { class: `tag tag-${stage.toLowerCase()}${has ? "" : " is-missing"}` }, `${stage}: ${has ? "supplied" : "not supplied"}`))
+    )
   );
 }
 
@@ -617,6 +675,9 @@ function moveForm(idea, position) {
   const result = h("div", { class: "gate-result", "aria-live": "polite" });
   const formEl = h("form", { class: "card review-form", novalidate: "" });
   const next = idea.nextGate;
+  const prefilled = next?.suggestedNote ?? "";
+  note.value = prefilled;
+  if (prefilled) note.rows = 5;
 
   const setBusy = (busy, text) => {
     formEl.querySelectorAll("button").forEach((button) => (button.disabled = busy));
@@ -633,6 +694,12 @@ function moveForm(idea, position) {
   const send = async (direction, overrideReason) => {
     if (note.value.trim() === "") {
       fail("Add a short note saying why before moving the idea.");
+      note.focus();
+      return;
+    }
+    // The template's text belongs to the forward move; a move back needs its own note.
+    if (direction === "back" && prefilled && note.value.trim() === prefilled) {
+      fail("Type a note saying why this idea is moving back.");
       note.focus();
       return;
     }
@@ -682,6 +749,13 @@ function moveForm(idea, position) {
     next && h("p", { class: "gate-bar" }, h("strong", null, `To move to ${next.to}: `), next.bar),
     h("label", { class: "prompt", for: "move-note" }, "A short note is required and is kept in the idea's history."),
     note,
+    prefilled &&
+      h(
+        "p",
+        { class: "hint prefill-note" },
+        `Filled in from the template's "${next.suggestedFrom}" section. Use it, edit it, or replace it.`,
+        next.suggestedShortened && " It was shortened to fit the 500-character limit."
+      ),
     h(
       "div",
       { class: "form-row" },
@@ -701,9 +775,10 @@ function moveForm(idea, position) {
 
 function outcomeForm(idea) {
   const description = h("textarea", { id: "outcome-description", rows: 2, maxLength: 500, placeholder: "What has this idea led to?" });
-  description.value = idea.outcome?.description ?? "";
+  const offered = idea.suggestedOutcome;
+  description.value = idea.outcome?.description ?? offered?.description ?? "";
   const hours = h("input", { id: "outcome-hours", type: "number", min: "0", step: "0.5", inputMode: "decimal" });
-  hours.value = idea.outcome ? String(idea.outcome.hoursSavedPerWeek) : "";
+  hours.value = idea.outcome ? String(idea.outcome.hoursSavedPerWeek) : offered?.hoursSavedPerWeek != null ? String(offered.hoursSavedPerWeek) : "";
   const message = h("span", { class: "hint form-message", role: "status" });
 
   const formEl = h(
@@ -714,6 +789,13 @@ function outcomeForm(idea) {
     description,
     h("label", { class: "prompt", for: "outcome-hours" }, "Estimated hours saved per week (your estimate)"),
     hours,
+    offered &&
+      h(
+        "p",
+        { class: "hint prefill-note" },
+        "Filled in from the template. Nothing is recorded until you save.",
+        offered.shortened && " The description was shortened to fit the 500-character limit."
+      ),
     h("div", { class: "form-row" }, message, h("button", { type: "submit", class: "btn btn-primary" }, idea.outcome ? "Update outcome" : "Record outcome"))
   );
 
