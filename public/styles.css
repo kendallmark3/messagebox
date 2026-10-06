@@ -696,6 +696,47 @@ a.btn {
   flex: none;
 }
 
+.row-with-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.row-with-action + .row-with-action {
+  border-top: 1px solid var(--line);
+}
+
+.row-with-action .idea-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.delete-control {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 8px;
+  padding-right: 8px;
+}
+
+.delete-control .btn {
+  padding: 7px 14px;
+}
+
+.delete-question {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-danger {
+  background: var(--red);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #951f18;
+}
+
 /* Review board */
 
 .board {
@@ -952,6 +993,77 @@ a.btn {
 
 .conditional .sub-title {
   margin-bottom: 2px;
+}
+
+/* Evidence gate (V6) */
+
+.gate-bar {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--blue-soft);
+}
+
+.gate-result:not(:empty) {
+  margin-top: 16px;
+}
+
+.gate-panel {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-left: 5px solid var(--orange);
+  border-radius: 12px;
+  background: var(--orange-soft);
+}
+
+.gate-verdict {
+  font-size: 17px;
+}
+
+.gate-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.gate-panel textarea {
+  margin-top: 0;
+  background: var(--surface);
+}
+
+.gate-panel .form-row {
+  margin-top: 4px;
+}
+
+.gate-met {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.gate-overridden {
+  background: var(--orange-soft);
+  color: #b85a08;
+}
+
+.history .badge {
+  margin-left: 10px;
+  font-size: 12px;
+  padding: 2px 10px;
+}
+
+.history-gate {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #f6f8fc;
+  font-size: 14px;
 }
 
 /* Analytics and Impact */

@@ -276,7 +276,40 @@ async function renderMyIdeas() {
     );
   }
   const newestFirst = [...ideas].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  return h("section", { class: "card list" }, newestFirst.map((idea) => ideaRow(idea, `#/my-ideas/${idea.id}`)));
+  return h(
+    "section",
+    { class: "card list" },
+    newestFirst.map((idea) => h("div", { class: "row-with-action" }, ideaRow(idea, `#/my-ideas/${idea.id}`), deleteControl(idea)))
+  );
+}
+
+// A Delete button that asks once before deleting. Shown only in My Ideas.
+function deleteControl(idea) {
+  const control = h("span", { class: "delete-control" });
+  const ask = () => {
+    const message = h("span", { class: "form-message is-error", role: "status" });
+    const confirm = h("button", { type: "button", class: "btn btn-danger" }, "Yes, delete");
+    confirm.addEventListener("click", async () => {
+      confirm.disabled = true;
+      try {
+        await api(`/api/ideas/${idea.id}?submitterId=${encodeURIComponent(getSubmitterId())}`, { method: "DELETE" });
+        if (location.hash === "#/my-ideas") await route();
+        else location.hash = "#/my-ideas";
+      } catch (error) {
+        message.textContent = error.message;
+        confirm.disabled = false;
+      }
+    });
+    control.replaceChildren(
+      h("span", { class: "delete-question" }, "Delete this idea for good?"),
+      confirm,
+      h("button", { type: "button", class: "btn btn-secondary", onclick: reset }, "Cancel"),
+      message
+    );
+  };
+  const reset = () => control.replaceChildren(h("button", { type: "button", class: "btn btn-quiet", onclick: ask }, "Delete"));
+  reset();
+  return control;
 }
 
 /* Review Pipeline */
@@ -306,7 +339,13 @@ async function renderPipeline() {
                 "a",
                 { class: "board-card", href: `#/pipeline/${idea.id}` },
                 h("span", { class: "board-card-text" }, idea.suggestion.length > 90 ? `${idea.suggestion.slice(0, 90).trimEnd()}…` : idea.suggestion),
-                h("span", { class: "board-card-tags" }, badge(idea.evaluation.recommendation), idea.analysis && h("span", { class: "badge badge-ai" }, "Analysis"))
+                h(
+                  "span",
+                  { class: "board-card-tags" },
+                  badge(idea.evaluation.recommendation),
+                  idea.analysis && h("span", { class: "badge badge-ai" }, "Analysis"),
+                  idea.history.at(-1)?.override && h("span", { class: "badge gate-overridden" }, "Overridden")
+                )
               )
             )
       );
@@ -330,7 +369,8 @@ async function renderDetail(view, id) {
       { class: "card" },
       h("div", { class: "evaluation-head" }, h("h2", { class: "card-title" }, "Suggestion"), stageTag(idea.stage)),
       h("p", { class: "suggestion-text" }, idea.suggestion),
-      h("p", { class: "hint" }, `Submitted ${formatDate(idea.submittedAt)}`)
+      h("p", { class: "hint" }, `Submitted ${formatDate(idea.submittedAt)}`),
+      view === "my-ideas" && idea.submitterId === getSubmitterId() && h("div", { class: "form-row" }, h("span"), deleteControl(idea))
     ),
     pipelineCard(idea.stage, "This idea is here"),
     view === "pipeline" && moveForm(idea, position),
@@ -505,6 +545,15 @@ function legacyArchitectureCard(analysis, footer) {
   );
 }
 
+// Moves made before the evidence gate have no check recorded and get no tag.
+function gateTag(entry) {
+  if (!entry.gate) return null;
+  if (entry.override) {
+    return h("span", { class: "badge gate-overridden" }, entry.gate.verdict === "Not checked" ? "Not checked, moved anyway" : "Overridden");
+  }
+  return h("span", { class: "badge gate-met" }, "Met the bar");
+}
+
 function historyCard(idea) {
   return h(
     "section",
@@ -521,7 +570,10 @@ function historyCard(idea) {
               null,
               h("span", { class: "history-move" }, `${entry.from} → ${entry.to}`),
               h("span", { class: "hint" }, formatDate(entry.at)),
-              h("p", null, entry.note)
+              gateTag(entry),
+              h("p", null, entry.note),
+              entry.override && h("p", null, h("strong", null, "Moved anyway because: "), entry.override),
+              entry.gate && entry.gate.verdict !== "Not checked" && h("div", { class: "history-gate" }, h("p", { class: "hint" }, entry.gate.reason), gateEvidence(entry.gate))
             )
           )
         )
@@ -554,25 +606,80 @@ async function saveAndRefresh(formEl, messageEl, request) {
   }
 }
 
-function moveForm(idea, position) {
-  const note = h("textarea", { id: "move-note", rows: 2, maxLength: 500, placeholder: "Why is this idea moving?" });
-  const message = h("span", { class: "hint form-message", role: "status" });
-  const formEl = h("form", { class: "card review-form", novalidate: "" });
+function gateEvidence(gate) {
+  const list = (label, items) => items.length > 0 && h("div", null, h("p", { class: "gate-label" }, label), h("ul", { class: "plain-list" }, items.map((item) => h("li", null, item))));
+  return [list("Counts as evidence", gate.known), list("Does not count", gate.unverified)];
+}
 
-  const move = (direction) => {
+function moveForm(idea, position) {
+  const note = h("textarea", { id: "move-note", rows: 2, maxLength: 500, placeholder: "What has been measured or observed since the last stage?" });
+  const message = h("span", { class: "hint form-message", role: "status" });
+  const result = h("div", { class: "gate-result", "aria-live": "polite" });
+  const formEl = h("form", { class: "card review-form", novalidate: "" });
+  const next = idea.nextGate;
+
+  const setBusy = (busy, text) => {
+    formEl.querySelectorAll("button").forEach((button) => (button.disabled = busy));
+    note.readOnly = busy;
+    message.textContent = text || "";
+    message.className = "hint form-message";
+  };
+  const fail = (text) => {
+    setBusy(false);
+    message.textContent = text;
+    message.className = "form-message is-error";
+  };
+
+  const send = async (direction, overrideReason) => {
     if (note.value.trim() === "") {
-      message.textContent = "Add a short note saying why before moving the idea.";
-      message.className = "form-message is-error";
+      fail("Add a short note saying why before moving the idea.");
       note.focus();
       return;
     }
-    saveAndRefresh(formEl, message, () =>
-      api(`/api/ideas/${idea.id}/stage`, { method: "POST", body: { direction, note: note.value.trim() } })
-    );
+    setBusy(true, direction === "forward" && !overrideReason ? "Checking the evidence…" : "Saving…");
+    try {
+      const body = { direction, note: note.value.trim() };
+      if (overrideReason) body.overrideReason = overrideReason;
+      const response = await api(`/api/ideas/${idea.id}/stage`, { method: "POST", body });
+      if (response.moved) return await route();
+      setBusy(false);
+      showNotMoved(response);
+    } catch (error) {
+      fail(error.message);
+    }
   };
+
+  // The idea was not moved: say why, and offer moving anyway with a reason.
+  function showNotMoved({ gate, checkError }) {
+    const reason = h("textarea", { id: "override-reason", rows: 2, maxLength: 500, placeholder: "Why move it without meeting the bar?" });
+    const overrideMessage = h("span", { class: "form-message is-error", role: "status" });
+    const moveAnyway = () => {
+      if (reason.value.trim() === "") {
+        overrideMessage.textContent = "Give a reason to move it anyway. It is kept in the idea's history.";
+        reason.focus();
+        return;
+      }
+      send("forward", reason.value.trim());
+    };
+    result.replaceChildren(
+      h(
+        "div",
+        { class: "gate-panel gate-not-yet", role: "alert" },
+        h("strong", { class: "gate-verdict" }, gate ? `Not yet: this does not meet the bar for ${next.to}` : "The evidence could not be checked"),
+        h("p", null, gate ? gate.reason : `${checkError} You can try again, or move the idea anyway with a reason.`),
+        gate && h("p", null, h("strong", null, "What's missing: "), gate.missing),
+        gate && gateEvidence(gate),
+        h("p", { class: "hint" }, "Improve the note above and move again, or:"),
+        h("label", { class: "gate-label", for: "override-reason" }, "Move anyway, with a reason"),
+        reason,
+        h("div", { class: "form-row" }, overrideMessage, h("button", { type: "button", class: "btn btn-secondary", onclick: moveAnyway }, `Move to ${next.to} anyway`))
+      )
+    );
+  }
 
   formEl.append(
     h("h2", { class: "card-title" }, "Move this idea"),
+    next && h("p", { class: "gate-bar" }, h("strong", null, `To move to ${next.to}: `), next.bar),
     h("label", { class: "prompt", for: "move-note" }, "A short note is required and is kept in the idea's history."),
     note,
     h(
@@ -582,11 +689,11 @@ function moveForm(idea, position) {
       h(
         "span",
         { class: "button-group" },
-        position > 0 && h("button", { type: "button", class: "btn btn-secondary", onclick: () => move("back") }, `← Back to ${STAGE_NAMES[position - 1]}`),
-        position < STAGE_NAMES.length - 1 &&
-          h("button", { type: "button", class: "btn btn-primary", onclick: () => move("forward") }, `Move to ${STAGE_NAMES[position + 1]} →`)
+        position > 0 && h("button", { type: "button", class: "btn btn-secondary", onclick: () => send("back") }, `← Back to ${STAGE_NAMES[position - 1]}`),
+        next && h("button", { type: "button", class: "btn btn-primary", onclick: () => send("forward") }, `Move to ${next.to} →`)
       )
-    )
+    ),
+    result
   );
   formEl.addEventListener("submit", (event) => event.preventDefault());
   return formEl;

@@ -2,7 +2,7 @@
 
 Builds on [intentv1.md](intentv1.md) and [INTENT.md](INTENT.md). Everything in V1 stays as built unless this file says otherwise.
 
-Status: implemented. The **As Built** section at the end records the decisions the implementation made.
+Status: implemented. The **As Built** section at the end records the decisions the implementation made. [intentv6.md](intentv6.md) later added an evidence check to forward stage moves, which changes the `POST /api/ideas/:id/stage` request and response and adds fields to each history entry.
 
 ## 1. Intent / Goal
 
@@ -65,6 +65,7 @@ Unchanged from V1, except that a successful submission is saved and the screen s
 
 - Lists the ideas submitted from this browser, newest first: the start of the suggestion, the recommendation, the current stage, and the date.
 - Selecting an idea shows its full suggestion, its evaluation, its position in the pipeline, and its stage history. From My Ideas this is read-only: there are no move or outcome controls, though a recorded outcome is shown.
+- The person can delete any of their own ideas, after confirming. This was added after V2 at the author's request.
 - With no ideas, shows a short empty state that points to Submit Idea.
 
 ### Review Pipeline
@@ -185,12 +186,14 @@ All routes are under `/api/ideas`, take and return JSON, and report errors as `{
 | `POST /api/ideas` | Takes `{ suggestion, submitterId }`, evaluates, stores | 201 `{ idea }` |
 | `POST /api/ideas/:id/stage` | Takes `{ direction: "forward" or "back", note }` | 200 `{ idea }` |
 | `PUT /api/ideas/:id/outcome` | Takes `{ description, hoursSavedPerWeek }` | 200 `{ idea }` |
+| `DELETE /api/ideas/:id?submitterId=` | Deletes the idea for good | 200 `{ deleted: true }` |
 
 Rules the server enforces:
 
 - A note or description is trimmed and must be 1 to 500 characters (400 otherwise).
 - A move is exactly one stage. Moving back from Problem or forward from Investment is refused (409). There is no way to name a target stage.
 - An outcome is accepted only at Pilot or Investment (409 otherwise). Hours must be a number from 0 to 100,000 (400 otherwise). Recording again replaces the previous outcome.
+- An idea can be deleted only when `submitterId` matches the one it was submitted with (403 "Only the person who submitted an idea can delete it." otherwise). With no sign-in this guards against accidents; it is not a security boundary. Deleting removes the idea from the store entirely, including its history, outcome, and analysis.
 - An unknown idea returns 404; any other method returns 405.
 - V1's `POST /api/evaluate` no longer exists.
 
@@ -210,7 +213,7 @@ Rules the server enforces:
 
 - "+ New Idea" is on every view; it resets the Submit view and goes to it.
 - After a successful submission, the Evaluation card ends with "Saved. View it in My Ideas", linking to that idea.
-- **My Ideas** is one card of rows, newest first. Each row shows up to 140 characters of the suggestion, "Submitted" and the date, the recommendation pill, and a stage tag with a dot in the stage colour.
+- **My Ideas** is one card of rows, newest first. Each row shows up to 140 characters of the suggestion, "Submitted" and the date, the recommendation pill, and a stage tag with a dot in the stage colour. Each row ends with a "Delete" button. Pressing it asks "Delete this idea for good?" with "Yes, delete" and "Cancel"; nothing is deleted until the first is pressed. The same control appears on the idea's own page when it is opened from My Ideas. It is not offered in Review Pipeline or Impact, or for an idea submitted from another browser.
 - **Review Pipeline** is five columns in stage order, each with a coloured dot, the stage name, and a count. Each idea is a card showing up to 90 characters of the suggestion and its recommendation pill. An empty column says "No ideas here yet".
 - **Idea detail**, top to bottom: a "← Back to" link for the view it was opened from; the Suggestion card with the stage tag and date; the Idea Pipeline with this idea's stage marked "This idea is here"; "Move this idea" (Review Pipeline only); Evaluation; Outcome; Stage history.
   - "Move this idea" has a note box and up to two buttons, "← Back to <stage>" and "Move to <stage> →". A blank note shows "Add a short note saying why before moving the idea."
