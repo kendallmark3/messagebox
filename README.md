@@ -14,7 +14,7 @@ cp .env.example .env   # then put your Anthropic API key in .env
 npm start
 ```
 
-Open http://localhost:3210. Set `PORT` in `.env` to use a different port.
+Open http://localhost:3210. Set `PORT` in `.env` to use a different port. The app is reachable only from your own machine unless you set `HOST`; it has no sign-in.
 
 The API key is read by the server only. It is never sent to the browser, and `.env` is git-ignored.
 

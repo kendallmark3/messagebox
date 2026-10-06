@@ -5,6 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 - `npm install` then `npm start` runs the app at http://localhost:3210 (`PORT` overrides it). Requires Node 20.12+.
+- Text that looks like a credential is refused on submission (`SECRET_PATTERNS` in `server.js`), so it is never stored or sent to the model. This exists because a real API key was once pasted into the suggestion box.
+- The server binds to `127.0.0.1` only. `HOST=0.0.0.0` exposes it to the network; there is no sign-in, so every stored idea is then readable by anyone who can reach the port.
 - `ANTHROPIC_API_KEY` is read from `.env` (copy `.env.example`) or the process environment.
 - There is no build step, linter, or test suite.
 - `IDEAS_FILE=/some/path.json` points the server at a different idea store. Use it for any test run: `data/ideas.json` holds the author's real ideas.
