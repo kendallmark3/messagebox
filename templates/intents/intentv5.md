@@ -1,8 +1,12 @@
 # AI Suggestion Box — V5 Intent
 
-Builds on [intentv1.md](intentv1.md), [INTENT.md](INTENT.md), [intentv2.md](intentv2.md), and [intentv3.md](intentv3.md). It replaces the analysis contract, prompt, and screen section defined in V3; everything else in V1 to V3 stays as built. It does not depend on [intentv4.md](intentv4.md), which is not yet implemented.
+**Builds on:** [INTENT.md](INTENT.md) (V1), [intentv2.md](intentv2.md), and [intentv3.md](intentv3.md). It replaces the analysis contract, prompt, screen section, and messages defined in V3; everything else in V1 to V3 stays as built.
 
-Status: implemented. The **As Built** section at the end records the decisions the implementation made.
+**Status:** Implemented.
+
+**Later changes:** none to what this file defines. [intentv6.md](intentv6.md) added an evidence check to the stage move that triggers the analysis, and marks an overridden note as such in the record the analysis reads.
+
+See [README.md](README.md) in this folder for how the intents fit together.
 
 ## 1. Intent / Goal
 
@@ -22,7 +26,7 @@ A review of a V3 analysis for a real test idea (weekly status reporting, taken t
 2. **The architecture came first and ran long.** The evidence already supported a plain conclusion: do not build yet, measure the remaining 32 minutes. The analysis reached it only in its last field, after about 800 words of solution design.
 3. **Nothing said what would justify building.** The pipeline had no stated bar for investing.
 
-### Current state
+### State when this intent was written
 
 - V3 is implemented and merged. Moving an idea from Evidence to Prototype starts the analysis; a reviewer can run it again from Review Pipeline at Prototype or beyond.
 - The V3 result has ten fields led by `summary` and `pattern`, with unknowns under `assumptions` and the next action last, under `firstPrototype`.

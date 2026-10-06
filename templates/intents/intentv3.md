@@ -1,8 +1,16 @@
 # AI Suggestion Box — V3 Intent
 
-Builds on [intentv1.md](intentv1.md), [INTENT.md](INTENT.md), and [intentv2.md](intentv2.md). Everything in V1 and V2 stays as built unless this file says otherwise.
+**Builds on:** [INTENT.md](INTENT.md) (V1) and [intentv2.md](intentv2.md).
 
-Status: implemented, then partly superseded. [intentv5.md](intentv5.md) replaces the analysis contract, the prompt, the screen section, and the analysis messages described here. When the analysis runs, who can see it, how it is stored, and how failures are handled are still as this file describes.
+**Status:** Implemented, then partly superseded.
+
+**Later changes:** the sections below describe V3 as it was specified and built. Later intents changed these parts:
+
+- [intentv5.md](intentv5.md) replaces the analysis contract, the system prompt, the screen section (now titled "Analysis"), and the analysis messages. Everything in this file about those four things is historical, including the "Potential architecture" wording and the prompt in the appendix.
+- Still current from this file: when the analysis runs, what it is given, who can see it, how it is stored, its status values, and how failures are handled.
+- [intentv6.md](intentv6.md) adds a third AI call and puts an evidence check in front of the move that triggers the analysis. The analysis still starts whether that check passed or was overridden.
+
+See [README.md](README.md) in this folder for how the intents fit together.
 
 ## 1. Intent / Goal
 

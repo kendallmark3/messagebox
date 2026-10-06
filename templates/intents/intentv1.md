@@ -1,5 +1,7 @@
 # AI Suggestion Box — V1 Intent
 
+**Status:** The original intent, kept as written. It was implemented through [INTENT.md](INTENT.md), and later intents deliberately relaxed some of its boundaries (persistence, working navigation, a pipeline workflow, and one approval). See [README.md](README.md) in this folder.
+
 ## Intent
 
 Build the first working version of an AI-powered employee suggestion workbench.
