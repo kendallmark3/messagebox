@@ -93,3 +93,9 @@ The installed plugin provides the workflow this project uses:
 - A Stop hook (`scripts/forbid-secrets.py`) that scans the git diff for likely secrets and blocks finishing if it finds one.
 
 The `location-story` skill in the plugin is for map and geocoding projects and does not apply here.
+
+## intent-driven-training/
+
+A copy of the author's Intent-Driven Training plugin (v1.2.0, from https://github.com/kendallmark3/modelgate), kept for reference in the same way. It is not application code. The plugin is installed for the author's user account from the `intent-driven-training` marketplace, and Claude Code runs that installed version, not this copy.
+
+It provides the commands `setup-feature`, `run-feature`, `prove-feature`, `review-intent`, `context-map`, and `simplify`, and the skills `model-gate` (choosing the minimum sufficient model before implementation), `feature-workflow`, and `context-discipline`.
