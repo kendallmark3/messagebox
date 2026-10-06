@@ -131,8 +131,8 @@ These are the decisions the V1 implementation made. V2 and V3 extend them; where
 
 - Node.js 20.12 or later, ES modules, no framework and no build step.
 - Two dependencies only: `@anthropic-ai/sdk` and `zod`.
-- `npm start` runs `node server.js`. The server listens on port 3210, or `PORT` if set.
-- A `.env` file is loaded when present. `.env.example` documents `ANTHROPIC_API_KEY` and `PORT`. `.env` and `node_modules/` are git-ignored.
+- `npm start` runs `node server.js`. The server listens on port 3210, or `PORT` if set, and only on `127.0.0.1` unless `HOST` is set. There is no sign-in, so it is not reachable from other machines by default.
+- A `.env` file is loaded when present. `.env.example` documents `ANTHROPIC_API_KEY`, `PORT`, and `HOST`. `.env` and `node_modules/` are git-ignored.
 - `server.js` is a plain `node:http` server. It serves exactly three files from `public/` (`/` as `index.html`, `/styles.css`, `/app.js`) through an explicit allow-list; every other path returns 404.
 - `public/` holds `index.html`, `styles.css`, and `app.js`, with no client-side libraries. Icons are inline SVG symbols.
 
@@ -149,6 +149,7 @@ These are the decisions the V1 implementation made. V2 and V3 extend them; where
 
 - V1 exposed `POST /api/evaluate`, taking `{ suggestion }` and returning `{ evaluation }`. V2 replaced it with `POST /api/ideas`.
 - The suggestion is trimmed and must be 1 to 4,000 characters. Request bodies over 32 KB are rejected.
+- A suggestion, stage note, or outcome description that looks like a credential (an API key, access token, or private key) is refused before it is stored or sent to the model.
 - Errors are returned as `{ error }` with a short user-safe message; details go to the server log only.
 
 | Situation | Status | Message |
@@ -156,6 +157,7 @@ These are the decisions the V1 implementation made. V2 and V3 extend them; where
 | Empty suggestion | 400 | Describe your idea or problem first. |
 | Too long | 400 | Please keep it under 4000 characters. |
 | Unreadable request | 400 | The request could not be read. |
+| Text that looks like a credential | 400 | That looks like a password or API key. Remove it and try again. |
 | No or invalid API key | 503 | The evaluation service is not configured yet. |
 | Rate limited | 503 | The evaluation service is busy. Please try again in a moment. |
 | API failure or output not matching the contract | 502 | We couldn't evaluate this idea. Please try again. |

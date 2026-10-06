@@ -14,6 +14,8 @@ try {
 }
 
 const PORT = Number(process.env.PORT) || 3210;
+// Local only by default: there is no sign-in, so anyone who can reach the port can read every idea.
+const HOST = process.env.HOST || "127.0.0.1";
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
 const MAX_SUGGESTION_CHARS = 4000;
 const MAX_BODY_BYTES = 32 * 1024;
@@ -155,9 +157,25 @@ function findIdea(id) {
   return idea;
 }
 
+// Text that looks like a credential is refused before it is stored or sent to the model.
+const SECRET_PATTERNS = [
+  /\bsk-[A-Za-z0-9]{2,}-[A-Za-z0-9_-]{16,}/,
+  /\bsk-[A-Za-z0-9_-]{24,}/,
+  /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/,
+  /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,
+  /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
+];
+const SECRET_MESSAGE = "That looks like a password or API key. Remove it and try again.";
+
+function refuseSecrets(text) {
+  if (SECRET_PATTERNS.some((pattern) => pattern.test(text))) throw new RequestError(400, SECRET_MESSAGE);
+}
+
 function requireText(value, label, maxChars) {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) throw new RequestError(400, `${label} is required.`);
+  refuseSecrets(text);
   if (text.length > maxChars) throw new RequestError(400, `${label} must be under ${maxChars} characters.`);
   return text;
 }
@@ -311,6 +329,7 @@ async function createIdea(body) {
   if (suggestion.length > MAX_SUGGESTION_CHARS) {
     throw new RequestError(400, `Please keep it under ${MAX_SUGGESTION_CHARS} characters.`);
   }
+  refuseSecrets(suggestion);
   if (typeof body.submitterId !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(body.submitterId)) {
     throw new RequestError(400, "The request could not be read.");
   }
@@ -417,6 +436,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 await loadIdeas();
-server.listen(PORT, () => {
-  console.log(`Ideas Workbench running at http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`Ideas Workbench running at http://${HOST === "127.0.0.1" ? "localhost" : HOST}:${PORT}`);
 });
