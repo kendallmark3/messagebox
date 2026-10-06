@@ -2,7 +2,7 @@
 
 An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work. AI returns a short structured evaluation, the idea is kept and moved through a pipeline as it earns it, and once it is approved for prototyping the workbench says what the evidence justifies doing next.
 
-> **Status:** release candidate (git tag `candidate`). Implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 (analysis on approval), V4 (submitting from a template), V5 (the evidence-led form of that analysis), and V6 (an evidence gate on every forward move). All three AI calls have been run against the live Anthropic API.
+> **Status:** release candidate (git tag `candidate`). Implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 (analysis on approval), V4 (submitting from a template), V5 (the evidence-led form of that analysis), V6 (an evidence gate on every forward move), and V7 (a prototype admin approval before Investment). All three AI calls have been run against the live Anthropic API.
 
 ## Run it locally
 
@@ -17,6 +17,8 @@ npm start
 Open http://localhost:3210. Set `PORT` in `.env` to use a different port. The app is reachable only from your own machine unless you set `HOST`; it has no sign-in.
 
 The API key is read by the server only. It is never sent to the browser, and `.env` is git-ignored.
+
+To try the Investment approval, also set `ADMIN_PASSCODE` in `.env` to a passcode of your choosing. Without it, admin sign-in is switched off.
 
 Ideas are stored in `data/ideas.json`, which is created on first submission and git-ignored. Delete it to start empty.
 
@@ -81,6 +83,17 @@ Every forward move is checked against a fixed bar for the next stage, so an idea
 - If not, nothing is saved, and the reviewer is told the one thing that is missing. They can add it, or move the idea anyway with a reason.
 - Overrides are recorded in the idea's history and marked on the board. The gate never blocks a person outright.
 
+### Approval before Investment
+
+An idea at Pilot needs an admin's approval before it can move to Investment, and the approver cannot be the person who submitted it. Unlike the evidence gate, this one cannot be overridden.
+
+- Everyone sees the "Approve for Investment" button, so the step is visible in the process.
+- Pressing it without being signed in as admin, or as an admin in the browser the idea was submitted from, shows a message and approves nothing.
+- An admin signs in from "Admin sign-in" in the sidebar, with a name and the shared passcode set as `ADMIN_PASSCODE` in `.env`.
+- Moving an idea back clears its approval.
+
+This is a prototype of the rule, not real access control: there is one shared passcode and no user accounts, and "not the submitter" means "not the submitter's browser".
+
 ### Analysis on approval
 
 Moving an idea from Evidence to Prototype is the approval. It starts a second AI call that says what the evidence justifies doing next:
@@ -112,8 +125,8 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 
 ## What it deliberately does not do
 
-- sign-in, accounts, or roles
-- approval routing, assignments, notifications, budgeting, rewards, voting, or portfolio management
+- user accounts or per-person sign-in (there is one shared admin passcode, for the Investment approval only)
+- approval routing, multiple approvers, assignments, notifications, budgeting, rewards, voting, or portfolio management
 - Jira or other integrations
 - chat, AgentCore, or multi-agent orchestration
 - diagrams, generated code, cost estimates, or delivery plans
@@ -143,5 +156,6 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 | [intentv4.md](templates/intents/intentv4.md) | V4: submitting from a template, with its as-built decisions |
 | [intentv5.md](templates/intents/intentv5.md) | V5: the evidence-led analysis, with its as-built decisions and the analysis prompt |
 | [intentv6.md](templates/intents/intentv6.md) | V6: the evidence gate on forward moves, with its as-built decisions and the gate prompt |
+| [intentv7.md](templates/intents/intentv7.md) | V7: the admin approval before Investment, with its as-built decisions |
 
-The implemented intents, with their As Built sections, are meant to be enough to rebuild the app: INTENT.md, then intentv2.md to intentv6.md.
+The implemented intents, with their As Built sections, are meant to be enough to rebuild the app: INTENT.md, then intentv2.md to intentv7.md.

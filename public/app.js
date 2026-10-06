@@ -7,6 +7,9 @@ const STAGES = [
 ];
 const STAGE_NAMES = STAGES.map((stage) => stage.name);
 const OUTCOME_STAGES = ["Pilot", "Investment"];
+// An idea is approved by an admin at the first of these and cannot enter the second without it.
+const APPROVAL_FROM = "Pilot";
+const APPROVAL_FOR = "Investment";
 // An analysis exists only for ideas approved into this stage or beyond.
 const ANALYSIS_STAGE_INDEX = STAGE_NAMES.indexOf("Prototype");
 
@@ -90,14 +93,47 @@ function getSubmitterId() {
   }
 }
 
+// Admin sign-in (prototype). Kept for the browser session; the server forgets it on restart.
+const admin = { token: null, name: null };
+try {
+  admin.token = sessionStorage.getItem("adminToken");
+  admin.name = sessionStorage.getItem("adminName");
+} catch {
+  // No session storage: admin sign-in lasts until the page is closed.
+}
+
+function setAdmin(token, name) {
+  admin.token = token;
+  admin.name = name;
+  try {
+    if (token) {
+      sessionStorage.setItem("adminToken", token);
+      sessionStorage.setItem("adminName", name);
+    } else {
+      sessionStorage.removeItem("adminToken");
+      sessionStorage.removeItem("adminName");
+    }
+  } catch {
+    // Ignore: the in-memory copy is enough for this page.
+  }
+  drawAdminArea();
+}
+
+let toastTimer;
+function toast(message) {
+  const el = document.getElementById("toast");
+  el.textContent = message;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 6000);
+}
+
 async function api(path, { method = "GET", body } = {}) {
   let response;
   try {
-    response = await fetch(path, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const headers = body ? { "Content-Type": "application/json" } : {};
+    if (admin.token) headers.Authorization = `Bearer ${admin.token}`;
+    response = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   } catch {
     throw new Error("We couldn't reach the workbench. Check your connection and try again.");
   }
@@ -124,7 +160,8 @@ function stageTag(stage) {
   return h("span", { class: `tag tag-${stage.toLowerCase()}` }, stage);
 }
 
-function pipelineCard(currentStage, currentNote) {
+// `approval` is undefined on the generic picture, null when an idea still needs it, or the approval record.
+function pipelineCard(currentStage, currentNote, approval) {
   return h(
     "section",
     { class: "card pipeline", "aria-label": "Idea pipeline" },
@@ -139,7 +176,10 @@ function pipelineCard(currentStage, currentNote) {
           { class: `stage stage-${stage.name.toLowerCase()}${current ? " is-current" : ""}` },
           h("span", { class: "stage-dot" }, icon(stage.icon)),
           h("span", { class: "stage-name" }, stage.name),
-          h("span", { class: "stage-note" }, current ? currentNote : stage.note)
+          h("span", { class: "stage-note" }, current ? currentNote : stage.note),
+          stage.name === APPROVAL_FOR &&
+            approval !== "none" &&
+            h("span", { class: `approval-mark${approval ? " is-approved" : ""}` }, approval ? "Admin approved" : "Needs admin approval")
         );
       })
     )
@@ -386,7 +426,8 @@ async function renderPipeline() {
                   { class: "board-card-tags" },
                   badge(idea.evaluation.recommendation),
                   idea.analysis && h("span", { class: "badge badge-ai" }, "Analysis"),
-                  idea.history.at(-1)?.override && h("span", { class: "badge gate-overridden" }, "Overridden")
+                  idea.history.at(-1)?.override && h("span", { class: "badge gate-overridden" }, "Overridden"),
+                  idea.stage === APPROVAL_FROM && h("span", { class: `badge ${idea.approval ? "gate-met" : "badge-low"}` }, idea.approval ? "Approved" : "Awaiting approval")
                 )
               )
             )
@@ -416,12 +457,54 @@ async function renderDetail(view, id) {
       idea.supplied && suppliedRow(idea.supplied),
       view === "my-ideas" && idea.submitterId === getSubmitterId() && h("div", { class: "form-row" }, h("span"), deleteControl(idea))
     ),
-    pipelineCard(idea.stage, "This idea is here"),
+    // An idea that reached Investment before approvals existed has none to show; leave the mark off.
+    pipelineCard(idea.stage, "This idea is here", idea.approval ?? (idea.stage === APPROVAL_FOR ? "none" : null)),
+    approvalCard(view, idea),
     view === "pipeline" && moveForm(idea, position),
     evaluationCard(idea.evaluation),
     architectureSection(view, idea),
     canRecordOutcome ? outcomeForm(idea) : idea.outcome && outcomeSummary(idea.outcome),
     historyCard(idea)
+  );
+}
+
+// The approval step in front of Investment. The button is shown to everyone so the step is visible;
+// the server decides who may actually approve.
+function approvalCard(view, idea) {
+  const approved = idea.approval;
+  if (idea.stage !== APPROVAL_FROM && !approved) return null;
+  const approve = async (button) => {
+    if (!admin.token) return toast("Only admins can approve an idea. Sign in as admin first.");
+    button.disabled = true;
+    try {
+      await api(`/api/ideas/${idea.id}/approval`, { method: "POST", body: { submitterId: getSubmitterId() } });
+      toast(`Approved for ${APPROVAL_FOR}.`);
+      await route();
+    } catch (error) {
+      toast(error.message);
+      button.disabled = false;
+    }
+  };
+  return h(
+    "section",
+    { class: "card approval" },
+    h(
+      "div",
+      { class: "evaluation-head" },
+      h("h2", { class: "card-title" }, "Investment approval"),
+      h("span", { class: `badge ${approved ? "gate-met" : "gate-overridden"}` }, approved ? "Approved" : "Awaiting approval")
+    ),
+    approved
+      ? h("p", null, `Approved for ${APPROVAL_FOR} by ${approved.by} on ${formatDate(approved.at)}.`)
+      : h("p", null, `An admin must approve this idea before it can move to ${APPROVAL_FOR}. The approver cannot be the person who submitted it.`),
+    !approved &&
+      view === "pipeline" &&
+      h(
+        "div",
+        { class: "form-row" },
+        h("span", { class: "hint" }, admin.token ? `Signed in as admin: ${admin.name}` : "You are not signed in as admin."),
+        h("button", { type: "button", class: "btn btn-primary", id: "approve-btn", onclick: (event) => approve(event.currentTarget) }, `Approve for ${APPROVAL_FOR}`)
+      )
   );
 }
 
@@ -697,6 +780,10 @@ function moveForm(idea, position) {
       note.focus();
       return;
     }
+    if (direction === "forward" && next.to === APPROVAL_FOR && !idea.approval) {
+      toast(`This idea needs admin approval before it can move to ${APPROVAL_FOR}.`);
+      return;
+    }
     // The template's text belongs to the forward move; a move back needs its own note.
     if (direction === "back" && prefilled && note.value.trim() === prefilled) {
       fail("Type a note saying why this idea is moving back.");
@@ -961,6 +1048,99 @@ async function renderImpact() {
   );
 }
 
+/* Admin sign-in */
+
+function drawAdminArea() {
+  const area = document.getElementById("admin-area");
+  if (admin.token) {
+    area.replaceChildren(
+      h("span", { class: "admin-who" }, h("strong", null, "Admin: "), admin.name),
+      h(
+        "button",
+        {
+          type: "button",
+          class: "admin-link",
+          id: "admin-sign-out",
+          onclick: async () => {
+            await api("/api/admin/logout", { method: "POST" }).catch(() => {});
+            setAdmin(null, null);
+            route();
+          },
+        },
+        "Sign out"
+      )
+    );
+  } else {
+    area.replaceChildren(h("button", { type: "button", class: "admin-link", id: "admin-sign-in", onclick: openAdminDialog }, "Admin sign-in"));
+  }
+}
+
+function openAdminDialog() {
+  const name = h("input", { id: "admin-name", type: "text", maxLength: 60, autocomplete: "name" });
+  const passcode = h("input", { id: "admin-passcode", type: "password", autocomplete: "off" });
+  const message = h("p", { class: "form-message is-error", role: "status" });
+  const dialog = h("dialog", { class: "admin-dialog" });
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+  };
+  const formEl = h(
+    "form",
+    { novalidate: "" },
+    h("h2", { class: "card-title" }, "Admin sign-in"),
+    h("p", { class: "hint" }, "Admins can approve ideas for Investment. This is a prototype sign-in with one shared passcode."),
+    h("label", { class: "prompt", for: "admin-name" }, "Your name"),
+    name,
+    h("label", { class: "prompt", for: "admin-passcode" }, "Admin passcode"),
+    passcode,
+    message,
+    h(
+      "div",
+      { class: "form-row" },
+      h("button", { type: "button", class: "btn btn-secondary", onclick: close }, "Cancel"),
+      h("button", { type: "submit", class: "btn btn-primary" }, "Sign in")
+    )
+  );
+  formEl.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (name.value.trim() === "" || passcode.value === "") {
+      message.textContent = "Enter your name and the admin passcode.";
+      return;
+    }
+    try {
+      const result = await api("/api/admin/login", { method: "POST", body: { name: name.value.trim(), passcode: passcode.value } });
+      close();
+      setAdmin(result.token, result.name);
+      toast(`Signed in as admin: ${result.name}`);
+      route();
+    } catch (error) {
+      message.textContent = error.message;
+      passcode.value = "";
+    }
+  });
+  dialog.append(formEl);
+  dialog.addEventListener("cancel", () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  name.focus();
+}
+
+// A sign-in kept from before a server restart is no longer valid; drop it quietly.
+async function restoreAdmin() {
+  drawAdminArea();
+  if (!admin.token) return;
+  try {
+    const response = await fetch("/api/admin/me", { headers: { Authorization: `Bearer ${admin.token}` } });
+    await response.text();
+    if (response.status === 401) {
+      setAdmin(null, null);
+      route();
+    }
+  } catch {
+    // Leave it; the next request will say if the workbench is unreachable.
+  }
+}
+
 /* Router */
 
 const submitView = document.getElementById("view-submit");
@@ -1019,4 +1199,5 @@ window.addEventListener("hashchange", () => {
 });
 showSubmitPipeline("New ideas start here");
 syncSubmit();
+restoreAdmin();
 route();

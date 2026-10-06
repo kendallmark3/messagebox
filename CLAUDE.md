@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Text that looks like a credential is refused on submission (`SECRET_PATTERNS` in `server.js`), so it is never stored or sent to the model. This exists because a real API key was once pasted into the suggestion box.
 - The server binds to `127.0.0.1` only. `HOST=0.0.0.0` exposes it to the network; there is no sign-in, so every stored idea is then readable by anyone who can reach the port.
 - `ANTHROPIC_API_KEY` is read from `.env` (copy `.env.example`) or the process environment.
+- `ADMIN_PASSCODE`, also from `.env`, enables admin sign-in. Unset, sign-in is refused and no idea can be approved. Never print it, commit it, or put it in a test command; test runs use their own throwaway value.
 - There is no build step, linter, or test suite.
 - `IDEAS_FILE=/some/path.json` points the server at a different idea store. Use it for any test run: `data/ideas.json` holds the author's real ideas.
 
@@ -17,7 +18,7 @@ To exercise the UI without a real key, point the SDK at a local stand-in with `A
 
 Two pieces, with no framework and no build step:
 
-- `server.js` is a plain `node:http` server. It serves three static files from `public/` and the two template text files from `templates/` through an explicit allow-list (nothing else on disk is reachable) and exposes the ideas API under `/api/ideas`: list (optionally by `submitterId`), get one, create, `POST /:id/stage`, and `PUT /:id/outcome`.
+- `server.js` is a plain `node:http` server. It serves three static files from `public/` and the two template text files from `templates/` through an explicit allow-list (nothing else on disk is reachable) and exposes the ideas API under `/api/ideas`: list (optionally by `submitterId`), get one, create, delete, `POST /:id/stage`, `PUT /:id/outcome`, `POST /:id/analysis`, and `POST /:id/approval`. Admin sign-in is under `/api/admin` (`login`, `me`, `logout`).
   - There are three model calls, all through `askClaude` (`client.messages.parse` with a zod schema as the structured output format). Creating an idea runs the evaluation, and an idea is stored only if it succeeds. A forward stage move runs the gate check first and is saved only if it passes or carries an override reason. Moving forward into Prototype, or `POST /:id/analysis`, runs the analysis.
   - The last `Not yet` gate result per idea is held in memory (`gateResults`) so that moving anyway records the result the reviewer saw without a second model call.
   - The analysis runs in the background after the move has been saved, so its failure cannot affect the move. In-progress and failed runs are tracked in memory only (`analysisRuns`); every idea returned by the API carries a computed `analysisStatus` of `none`, `running`, `failed`, or `ready`. Only a complete result is written to `idea.analysis`, replacing the previous one.
@@ -31,6 +32,7 @@ Things that must change together:
 - The zod `Analysis` schema in `server.js` is the analysis contract; `analysisCard` in `public/app.js` renders its fields. `legacyArchitectureCard` renders analyses stored in the V3 shape, which have no `recommendation` field.
 - The zod `Gate` schema and `GATE_BARS` in `server.js` are the gate contract and the four bars. The page reads the bar from `nextGate` on each idea, so the bar text lives only on the server. `moveForm`, `gateEvidence`, and `gateTag` in `public/app.js` render the result.
 - The fixed investment trigger sentence is `INVESTMENT_TRIGGER` in `public/app.js`. It is supplied by the page, not by the model.
+- The approval stages are `APPROVAL_FROM` and `APPROVAL_FOR`, defined in both `server.js` and `public/app.js`. `approvalCard` in `public/app.js` renders the step; the page's own checks are a convenience, and the server enforces every rule.
 - The stage that triggers the analysis is `ANALYSIS_STAGE` in `server.js` and `ANALYSIS_STAGE_INDEX` in `public/app.js`.
 - The template's section names are `TEMPLATE_SECTIONS` in `server.js`, and `SECTION_FOR_STAGE` maps each stage to the section that supplies its move note. Both must match the headings in `templates/idea-template.txt` and `templates/example-idea.txt`. Recognition (`parseTemplate`) is fixed rules, not AI.
 - The page does not parse templates. It reads `title`, `supplied`, `nextGate.suggestedNote`, and `suggestedOutcome`, which the server computes for each idea.
@@ -47,10 +49,11 @@ The AI Suggestion Box ("Ideas Workbench"): a desktop-first web app where an empl
 The intent files live in `templates/intents/`. The author moved them there from the repository root; keep them there.
 
 - `intentv1.md` is the author's original intent and wins on product meaning. Do not edit it unless asked.
-- `INTENT.md` (V1) and `intentv2.md` to `intentv6.md` are all implemented. Each ends with **As Built** (and **Decisions Made** for V2 and V3), which record the concrete choices in the code: stack, API, limits, messages, screen layout, and wording. Together they are meant to be enough to rebuild the app.
+- `INTENT.md` (V1) and `intentv2.md` to `intentv7.md` are all implemented. Each ends with **As Built** (and **Decisions Made** for V2 and V3), which record the concrete choices in the code: stack, API, limits, messages, screen layout, and wording. Together they are meant to be enough to rebuild the app.
 - `intentv5.md` replaces V3's analysis contract, prompt, and screen section with the evidence-led version: recommendation first, evidence sorted into known, reported but unverified, and inferred, a fixed investment trigger, and the architecture shown only as conditional. `intentv3.md` still governs when the analysis runs, its storage, and its failure handling.
 - `intentv6.md` adds the evidence gate: every forward stage move is checked against a fixed bar for that stage, and is saved only on a pass or with a recorded override reason. It changes the stage endpoint and the history entries defined in `intentv2.md`.
 - `intentv4.md` adds submitting from a template. It was implemented after V5 and V6. `templates/idea-template.txt` and `templates/example-idea.txt` are the template itself: the server serves those two files to the Submit screen, so editing them changes what the app offers.
+- `intentv7.md` adds a prototype approval gate: an idea needs an admin's approval to move from Pilot to Investment, and the approver cannot be the submitter. It relaxes the earlier "no authentication, roles, or approvals" rule to exactly one role and one approval.
 - `README.md` is the reader-facing summary of the current app.
 
 Keeping these in line is part of any change:
@@ -66,14 +69,16 @@ Keeping these in line is part of any change:
 - The Anthropic API key is read from an environment variable and used server-side only.
 - There are exactly three AI calls: the evaluation at submission, the evidence check on each forward move, and the analysis on approval. Opening an idea never calls the AI. AI does not move ideas between stages or produce analytics or impact figures.
 - The move from Evidence to Prototype is the approval. There is no separate approve action or approver role.
-- The gate informs and records; it never blocks a person outright. Any forward move can be made anyway with a reason, and code, not the model, decides whether a move is saved (`moveIdea` in `server.js`).
+- The evidence gate informs and records; it never blocks a person outright. Any forward move can be made anyway with a reason, and code, not the model, decides whether a move is saved (`moveIdea` in `server.js`).
+- The approval gate is the one hard block: no idea enters Investment without `idea.approval`, checked in `moveIdea` before the evidence check, with no override. A backward move clears it.
+- Admin sign-in is prototype-grade: one shared `ADMIN_PASSCODE`, sign-ins held in memory, no accounts, no lockout. "Not the submitter" means "not the submitter's browser", and the page supplies that identity unverified. Do not describe this as security, and do not expose the app to a network on the strength of it.
 - The analysis is given only what is stored on the idea, must not invent systems, costs, or timelines, and is labelled as an AI-generated suggestion wherever shown.
 - The analysis recommends before it designs. Only evidence it classes as known may carry the recommendation or the conditional architecture; unclear reviewer notes are quoted under reported but unverified. Do not architect the imagined solution; architect the smallest next move the evidence justifies.
 - The recommendation is advice. It does not block or automate stage moves.
 - Impact numbers are reviewer-entered estimates and are labelled as such.
 - A template never moves an idea or records an outcome. It only fills in the note and the outcome form; the reviewer still clicks, and the gate still checks.
 - Views start empty; there are no seeded or invented ideas. The Top Ideas panel is a static example list.
-- No authentication, roles, approvals, notifications, chat, workflow engine, multi-agent orchestration, database server, or Jira integration.
+- No user accounts, per-person passwords, approval routing, notifications, chat, workflow engine, multi-agent orchestration, database server, or Jira integration. The only role is admin and the only approval is the one before Investment.
 
 Each intent's stop condition is deliberate: once its acceptance criteria are evidenced, stop rather than extending into further workflow features.
 

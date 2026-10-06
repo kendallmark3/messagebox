@@ -2,7 +2,7 @@
 
 Builds on [intentv1.md](intentv1.md) and [INTENT.md](INTENT.md). Everything in V1 stays as built unless this file says otherwise.
 
-Status: implemented. The **As Built** section at the end records the decisions the implementation made. [intentv6.md](intentv6.md) later added an evidence check to forward stage moves, which changes the `POST /api/ideas/:id/stage` request and response and adds fields to each history entry.
+Status: implemented. The **As Built** section at the end records the decisions the implementation made. [intentv6.md](intentv6.md) later added an evidence check to forward stage moves, which changes the `POST /api/ideas/:id/stage` request and response and adds fields to each history entry. [intentv7.md](intentv7.md) added an `approval` field to ideas and a single admin role.
 
 ## 1. Intent / Goal
 

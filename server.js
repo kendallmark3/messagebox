@@ -1,6 +1,6 @@
 import http from "node:http";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
@@ -258,6 +258,53 @@ function templateView(idea) {
   };
 }
 
+// Admin sign-in (prototype): one shared passcode from the environment, and sign-ins held in memory.
+// The stage an idea must be approved at, and the stage the approval lets it into.
+const APPROVAL_FROM = "Pilot";
+const APPROVAL_FOR = "Investment";
+const MAX_NAME_CHARS = 60;
+const adminSessions = new Map();
+
+function adminFor(req) {
+  const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1];
+  return token ? adminSessions.get(token) ?? null : null;
+}
+
+function signInAdmin(body) {
+  const passcode = process.env.ADMIN_PASSCODE;
+  if (!passcode) throw new RequestError(503, "Admin sign-in is not set up. Add ADMIN_PASSCODE to .env and restart.");
+  const name = requireText(body?.name, "Your name", MAX_NAME_CHARS);
+  const given = Buffer.from(typeof body.passcode === "string" ? body.passcode : "");
+  const expected = Buffer.from(passcode);
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    throw new RequestError(401, "That passcode is not right.");
+  }
+  const token = randomBytes(32).toString("hex");
+  adminSessions.set(token, { name });
+  return { token, name };
+}
+
+// Records an admin's approval for Investment. The approver must not be the submitter,
+// which here can only mean "not the browser the idea was submitted from".
+async function approveIdea(id, req, body) {
+  const idea = findIdea(id);
+  const admin = adminFor(req);
+  if (!admin) throw new RequestError(401, "Only admins can approve an idea. Sign in as admin first.");
+  if (idea.stage !== APPROVAL_FROM) {
+    throw new RequestError(409, `An idea can be approved for ${APPROVAL_FOR} only while it is at ${APPROVAL_FROM}.`);
+  }
+  if (idea.approval) throw new RequestError(409, "This idea has already been approved.");
+  if (typeof body?.submitterId !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(body.submitterId)) {
+    throw new RequestError(400, "The request could not be read.");
+  }
+  if (body.submitterId === idea.submitterId) {
+    throw new RequestError(403, "The approver cannot be the same person as the submitter. Only an admin who did not submit the idea can approve it.");
+  }
+  idea.approval = { by: admin.name, at: new Date().toISOString() };
+  await saveIdeas();
+  return idea;
+}
+
 // Ideas live in memory and are written to one JSON file after every change.
 let ideas = [];
 let writeQueue = Promise.resolve();
@@ -483,6 +530,7 @@ async function createIdea(body) {
     history: [],
     outcome: null,
     analysis: null,
+    approval: null,
   };
   ideas.push(idea);
   await saveIdeas();
@@ -532,6 +580,11 @@ async function moveIdea(id, body) {
     throw new RequestError(409, `An idea at ${idea.stage} cannot move ${forward ? "forward" : "back"}.`);
   }
 
+  // Approval is a hard requirement: it is checked before the evidence gate and has no override.
+  if (forward && target === APPROVAL_FOR && !idea.approval) {
+    throw new RequestError(409, `This idea needs admin approval before it can move to ${APPROVAL_FOR}.`);
+  }
+
   const entry = { from: idea.stage, to: target, note, at: null };
   if (forward) {
     if (gateRuns.has(id)) throw new RequestError(409, "The evidence for this idea is already being checked.");
@@ -560,6 +613,9 @@ async function moveIdea(id, body) {
   }
 
   entry.at = new Date().toISOString();
+  // The approval travels with the move it allowed; moving back means approving again.
+  if (forward && target === APPROVAL_FOR) entry.approval = idea.approval;
+  if (!forward) idea.approval = null;
   idea.history.push(entry);
   idea.stage = target;
   await saveIdeas();
@@ -600,6 +656,22 @@ async function recordOutcome(id, body) {
 
 async function handleApi(req, res, pathname, searchParams) {
   const [, , resource, id, action] = pathname.split("/");
+  if (resource === "admin" && !action) {
+    switch (`${req.method} ${id}`) {
+      case "POST login":
+        return sendJson(res, 200, signInAdmin(await readJsonBody(req)));
+      case "GET me": {
+        const admin = adminFor(req);
+        if (!admin) throw new RequestError(401, "Not signed in as admin.");
+        return sendJson(res, 200, { name: admin.name });
+      }
+      case "POST logout":
+        adminSessions.delete(/^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1]);
+        return sendJson(res, 200, { signedOut: true });
+      default:
+        throw new RequestError(404, "Not found.");
+    }
+  }
   if (resource !== "ideas" || pathname.split("/").length > 5) throw new RequestError(404, "Not found.");
   const route = `${req.method} ${id ? "/:id" : ""}${action ? `/${action}` : ""}`;
 
@@ -622,6 +694,8 @@ async function handleApi(req, res, pathname, searchParams) {
       return sendJson(res, 200, { deleted: true });
     case "PUT /:id/outcome":
       return sendJson(res, 200, { idea: present(await recordOutcome(id, await readJsonBody(req))) });
+    case "POST /:id/approval":
+      return sendJson(res, 200, { idea: present(await approveIdea(id, req, await readJsonBody(req))) });
     case "POST /:id/analysis":
       return sendJson(res, 202, { idea: present(requestAnalysis(id)) });
     default:
