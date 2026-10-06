@@ -1066,6 +1066,58 @@ a.btn {
   font-size: 14px;
 }
 
+/* Idea template (V4) */
+
+.template-row {
+  margin-top: 12px;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+#template-ask {
+  margin-left: 8px;
+  color: var(--ink);
+}
+
+.idea-title {
+  margin-bottom: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.supplied {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+}
+
+.supplied-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag.is-missing {
+  --tone: #b6c0d0;
+  background: transparent;
+  border: 1px dashed #b6c0d0;
+  color: var(--muted);
+}
+
+.prefill-note {
+  margin-top: 8px;
+}
+
 /* Analytics and Impact */
 
 .tiles {

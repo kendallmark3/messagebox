@@ -133,7 +133,7 @@ These are the decisions the V1 implementation made. V2 and V3 extend them; where
 - Two dependencies only: `@anthropic-ai/sdk` and `zod`.
 - `npm start` runs `node server.js`. The server listens on port 3210, or `PORT` if set, and only on `127.0.0.1` unless `HOST` is set. There is no sign-in, so it is not reachable from other machines by default.
 - A `.env` file is loaded when present. `.env.example` documents `ANTHROPIC_API_KEY`, `PORT`, and `HOST`. `.env` and `node_modules/` are git-ignored.
-- `server.js` is a plain `node:http` server. It serves exactly three files from `public/` (`/` as `index.html`, `/styles.css`, `/app.js`) through an explicit allow-list; every other path returns 404.
+- `server.js` is a plain `node:http` server. It serves exactly three files from `public/` (`/` as `index.html`, `/styles.css`, `/app.js`) through an explicit allow-list; every other path returns 404. V4 added the two template text files to that list.
 - `public/` holds `index.html`, `styles.css`, and `app.js`, with no client-side libraries. Icons are inline SVG symbols.
 
 ### The evaluation call
@@ -196,6 +196,8 @@ The browser flows were driven in headless Chrome against a local stand-in for th
 
 ## Appendix: Evaluation System Prompt
 
+V4 added the paragraph about filled-in forms; the rest is as V1 shipped it.
+
 ```text
 You evaluate employee suggestions for an internal ideas workbench.
 
@@ -208,6 +210,8 @@ Fill in each field in one to three short, plain sentences:
 - missingEvidence: what would need to be proven before anyone invests in it.
 - smallestNextStep: the cheapest practical way to investigate or test the idea.
 - recommendation: "Strong Candidate" when the problem is concrete and the value is evident from what was written; "Worth Exploring" when it is plausible and a cheap check would settle it; "Needs More Evidence" when the claim is plausible but key facts are missing; "Low Value / Unclear" when the text does not describe a real workplace problem or the benefit is negligible.
+
+The employee may have written the suggestion as a filled-in form with sections such as Evidence, Prototype, and Pilot. Treat what those sections report as part of what the employee wrote: do not list as missing anything they already supply, and say only what is still unknown.
 
 Base the assessment only on what the employee wrote. Do not invent numbers, names, or systems. When something is unknown, say so in missingEvidence. Do not prescribe AI or any particular technology as the solution.
 ```

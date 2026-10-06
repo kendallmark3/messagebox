@@ -2,7 +2,7 @@
 
 An AI-powered employee suggestion workbench. Employees describe a problem, improvement idea, or opportunity they see in their daily work. AI returns a short structured evaluation, the idea is kept and moved through a pipeline as it earns it, and once it is approved for prototyping the workbench says what the evidence justifies doing next.
 
-> **Status:** release candidate (git tag `candidate`). Implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 (analysis on approval), V5 (the evidence-led form of that analysis), and V6 (an evidence gate on every forward move). V4 (submitting from a template) is written as an intent but not yet built. All three AI calls have been run against the live Anthropic API.
+> **Status:** release candidate (git tag `candidate`). Implemented: V1 (submission and AI evaluation), V2 (My Ideas, Review Pipeline, Analytics, Impact), V3 (analysis on approval), V4 (submitting from a template), V5 (the evidence-led form of that analysis), and V6 (an evidence gate on every forward move). All three AI calls have been run against the live Anthropic API.
 
 ## Run it locally
 
@@ -40,6 +40,8 @@ The employee sees one prompt, **What's your idea or problem?**, and describes it
 - "We throw away usable packaging every week."
 
 There is one free-text input and no form. On submit, AI returns an evaluation and the idea is saved.
+
+Someone who already has evidence or results can submit from a template instead. "Use the template" on the Submit screen puts it in the box, and "see a filled-in example" shows a completed one. The workbench recognises the sections, lists the idea by its title, and later fills in each stage note and the outcome from the matching section, so nobody has to type them again. The template files are in [templates/](templates/).
 
 | Field | Question it answers |
 | --- | --- |
@@ -124,7 +126,7 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 | [server.js](server.js) | Serves the page, stores ideas, and makes the three Anthropic API calls: evaluation on submission, the evidence check on forward moves, and analysis on approval |
 | [public/](public/) | The workbench screens: HTML, CSS, and browser script |
 | [templates/intents/](templates/intents/) | The intent files the app was built from (see below) |
-| [templates/](templates/) | A blank idea template and a filled-in example to paste into Submit Idea |
+| [templates/](templates/) | The idea template and a filled-in example; the Submit screen offers both |
 | [concept.png](concept.png) | The concept image the screens follow |
 | [CLAUDE.md](CLAUDE.md) | Guidance for Claude Code when working in this repository |
 | [intent-driven-starter/](intent-driven-starter/) | Copy of the Intent-Driven Starter plugin (skills, agents, hooks) used to build from the intents |
@@ -138,8 +140,8 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 | [INTENT.md](templates/intents/INTENT.md) | Implementation-ready V1, with its as-built decisions and the evaluation prompt |
 | [intentv2.md](templates/intents/intentv2.md) | V2: stored ideas and the four remaining views |
 | [intentv3.md](templates/intents/intentv3.md) | V3: an AI analysis for approved ideas; its contract and prompt are superseded by V5 |
-| [intentv4.md](templates/intents/intentv4.md) | V4: submitting from a template. Not yet built |
+| [intentv4.md](templates/intents/intentv4.md) | V4: submitting from a template, with its as-built decisions |
 | [intentv5.md](templates/intents/intentv5.md) | V5: the evidence-led analysis, with its as-built decisions and the analysis prompt |
 | [intentv6.md](templates/intents/intentv6.md) | V6: the evidence gate on forward moves, with its as-built decisions and the gate prompt |
 
-The implemented intents, with their As Built sections, are meant to be enough to rebuild the app: INTENT.md, then intentv2.md, intentv3.md, intentv5.md, and intentv6.md.
+The implemented intents, with their As Built sections, are meant to be enough to rebuild the app: INTENT.md, then intentv2.md to intentv6.md.

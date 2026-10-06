@@ -27,11 +27,60 @@ const OUTCOME_STAGES = ["Pilot", "Investment"];
 // Moving an idea into this stage is the approval that triggers the analysis.
 const ANALYSIS_STAGE = "Prototype";
 
+const TEMPLATES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "templates");
 const STATIC_FILES = {
-  "/": ["index.html", "text/html; charset=utf-8"],
-  "/styles.css": ["styles.css", "text/css; charset=utf-8"],
-  "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/": [PUBLIC_DIR, "index.html", "text/html; charset=utf-8"],
+  "/styles.css": [PUBLIC_DIR, "styles.css", "text/css; charset=utf-8"],
+  "/app.js": [PUBLIC_DIR, "app.js", "text/javascript; charset=utf-8"],
+  // The same files a person can open and copy by hand; there is one source for the template text.
+  "/templates/idea-template.txt": [TEMPLATES_DIR, "idea-template.txt", "text/plain; charset=utf-8"],
+  "/templates/example-idea.txt": [TEMPLATES_DIR, "example-idea.txt", "text/plain; charset=utf-8"],
 };
+
+// The idea template: each section is its name and a colon on a line of its own.
+const TEMPLATE_SECTIONS = [
+  ["title", "Title"],
+  ["problem", "Problem"],
+  ["whoItAffects", "Who it affects"],
+  ["evidence", "Evidence"],
+  ["whyPrototype", "Why it is worth prototyping"],
+  ["prototype", "Prototype"],
+  ["pilot", "Pilot"],
+  ["outcome", "Outcome"],
+  ["hoursSavedPerWeek", "Hours saved per week"],
+];
+// The section that supplies the note for the move into each stage.
+const SECTION_FOR_STAGE = { Evidence: "evidence", Prototype: "whyPrototype", Pilot: "prototype", Investment: "pilot" };
+const SECTION_LABEL = Object.fromEntries(TEMPLATE_SECTIONS);
+
+// Returns the sections found, or null when the text is not in the template's form.
+// Fixed rules only: a submission is templated when it has a "Problem:" line.
+function parseTemplate(text) {
+  const keyByHeading = new Map(TEMPLATE_SECTIONS.map(([key, label]) => [`${label.toLowerCase()}:`, key]));
+  const found = {};
+  let current = null;
+  for (const line of text.split(/\r?\n/)) {
+    const key = keyByHeading.get(line.trim().toLowerCase());
+    if (key) {
+      current = key;
+      found[key] ??= [];
+    } else if (current) {
+      found[current].push(line);
+    }
+  }
+  if (!("problem" in found)) return null;
+  const sections = {};
+  for (const [key] of TEMPLATE_SECTIONS) {
+    const content = (found[key] ?? []).join("\n").trim();
+    // A section still holding only its [bracketed prompt] counts as empty.
+    sections[key] = content === "" || /^\[[^\]]*\]$/.test(content) ? null : content;
+  }
+  return sections;
+}
+
+function shorten(text, maxChars) {
+  return text.length > maxChars ? `${text.slice(0, maxChars - 1).trimEnd()}…` : text;
+}
 
 const Evaluation = z.object({
   problem: z.string(),
@@ -149,6 +198,8 @@ Fill in each field in one to three short, plain sentences:
 - smallestNextStep: the cheapest practical way to investigate or test the idea.
 - recommendation: "Strong Candidate" when the problem is concrete and the value is evident from what was written; "Worth Exploring" when it is plausible and a cheap check would settle it; "Needs More Evidence" when the claim is plausible but key facts are missing; "Low Value / Unclear" when the text does not describe a real workplace problem or the benefit is negligible.
 
+The employee may have written the suggestion as a filled-in form with sections such as Evidence, Prototype, and Pilot. Treat what those sections report as part of what the employee wrote: do not list as missing anything they already supply, and say only what is still unknown.
+
 Base the assessment only on what the employee wrote. Do not invent numbers, names, or systems. When something is unknown, say so in missingEvidence. Do not prescribe AI or any particular technology as the solution.`;
 
 // A failure the browser is allowed to see.
@@ -175,7 +226,35 @@ function present(idea) {
     ...idea,
     analysisStatus: run?.state ?? (idea.analysis ? "ready" : "none"),
     analysisError: run?.message ?? null,
-    nextGate: next ? { to: next, bar: GATE_BARS[next] } : null,
+    nextGate: next ? { to: next, bar: GATE_BARS[next], ...suggestedNote(idea, next) } : null,
+    ...templateView(idea),
+  };
+}
+
+// The template section that belongs to the move into `stage`, offered as the note for that move.
+function suggestedNote(idea, stage) {
+  const key = SECTION_FOR_STAGE[stage];
+  const text = idea.template?.[key];
+  if (!text) return { suggestedNote: null };
+  return { suggestedNote: shorten(text, MAX_NOTE_CHARS), suggestedFrom: SECTION_LABEL[key], suggestedShortened: text.length > MAX_NOTE_CHARS };
+}
+
+// What the page needs from a templated idea: its name, what each stage already has, and an outcome to offer.
+function templateView(idea) {
+  const sections = idea.template;
+  if (!sections) return { title: null, supplied: null, suggestedOutcome: null };
+  const hours = sections.hoursSavedPerWeek;
+  return {
+    title: sections.title ?? shorten(sections.problem.split("\n")[0], 80),
+    supplied: STAGES.slice(1).map((stage) => ({ stage, supplied: Boolean(sections[SECTION_FOR_STAGE[stage]]) })),
+    suggestedOutcome:
+      sections.outcome && !idea.outcome
+        ? {
+            description: shorten(sections.outcome, MAX_NOTE_CHARS),
+            hoursSavedPerWeek: hours && /^\d+(\.\d+)?$/.test(hours) ? Number(hours) : null,
+            shortened: sections.outcome.length > MAX_NOTE_CHARS,
+          }
+        : null,
   };
 }
 
@@ -384,6 +463,10 @@ async function createIdea(body) {
     throw new RequestError(400, `Please keep it under ${MAX_SUGGESTION_CHARS} characters.`);
   }
   refuseSecrets(suggestion);
+  const template = parseTemplate(suggestion);
+  if (template && !template.problem) {
+    throw new RequestError(400, "Describe the problem in the Problem section first.");
+  }
   if (typeof body.submitterId !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(body.submitterId)) {
     throw new RequestError(400, "The request could not be read.");
   }
@@ -394,6 +477,7 @@ async function createIdea(body) {
     submittedAt: new Date().toISOString(),
     submitterId: body.submitterId,
     suggestion,
+    template,
     evaluation,
     stage: STAGES[0],
     history: [],
@@ -563,9 +647,9 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     return res.end("Not found");
   }
-  const [file, contentType] = entry;
+  const [dir, file, contentType] = entry;
   res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-cache" });
-  res.end(await readFile(path.join(PUBLIC_DIR, file)));
+  res.end(await readFile(path.join(dir, file)));
 });
 
 await loadIdeas();
