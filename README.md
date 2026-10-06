@@ -128,6 +128,7 @@ The concept's search box, vote counts, and per-stage counts are deliberately lef
 | [concept.png](concept.png) | The concept image the screens follow |
 | [CLAUDE.md](CLAUDE.md) | Guidance for Claude Code when working in this repository |
 | [intent-driven-starter/](intent-driven-starter/) | Copy of the Intent-Driven Starter plugin (skills, agents, hooks) used to build from the intents |
+| [intent-driven-training/](intent-driven-training/) | Copy of the Intent-Driven Training plugin (commands and skills, including ModelGate), kept for reference |
 
 ## Intent files
 

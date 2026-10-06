@@ -1,0 +1,7 @@
+{
+  "name": "intent-driven-training",
+  "version": "1.2.0",
+  "description": "Lean Intent-Driven Engineering training plugin with context discipline, feature workflow, evidence, and ModelGate preflight.",
+  "author": {"name": "Mark Kendall"},
+  "keywords": ["intent-driven-engineering", "model-selection", "token-cost", "planning", "evidence", "context"]
+}
